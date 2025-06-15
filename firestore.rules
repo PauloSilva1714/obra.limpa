@@ -1,0 +1,47 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Função auxiliar para verificar se o usuário está autenticado
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Função auxiliar para verificar se o usuário é admin
+    function isAdmin() {
+      return isAuthenticated() && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+    
+    // Função auxiliar para verificar se o usuário é o dono do documento
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Regras para a coleção de usuários
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update, delete: if isAdmin() || isOwner(userId);
+    }
+
+    // Regras para a coleção de convites
+    match /invites/{inviteId} {
+      allow read: if isAuthenticated() && (
+        isAdmin() || 
+        resource.data.email == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.email
+      );
+      allow create: if isAdmin();
+      allow update: if isAdmin() || (
+        isAuthenticated() && 
+        resource.data.email == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.email
+      );
+      allow delete: if isAdmin();
+    }
+
+    // Regras para a coleção de sites
+    match /sites/{siteId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+  }
+} 
