@@ -1,11 +1,11 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { 
+import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signOut,
-  User as FirebaseUser
+  User as FirebaseUser,
 } from 'firebase/auth';
-import { 
+import {
   collection,
   doc,
   setDoc,
@@ -13,9 +13,9 @@ import {
   getDocs,
   query,
   where,
-  updateDoc
+  updateDoc,
 } from 'firebase/firestore';
-import { auth, db } from '@/config/firebase';
+import { auth, db } from './firebase';
 
 export interface User {
   id: string;
@@ -42,72 +42,94 @@ export interface Invite {
   invitedBy: string;
 }
 
-class AuthenticationService {
-  private readonly AUTH_KEY = '@auth_token';
-  private readonly USER_KEY = '@user_data';
-  private readonly SITE_KEY = '@current_site';
+export class AuthService {
+  private static USER_KEY = 'user';
+  static SITE_KEY = 'sua-chave-aqui';
 
-  // Demo users data
-  private demoUsers = [
-    {
-      id: '1',
-      name: 'João Silva',
-      email: 'admin@construcao.com',
-      password: 'admin123',
-      role: 'admin' as const,
-      sites: ['1', '2', '3'],
-      company: 'Construtora Silva'
-    },
-    {
-      id: '2',
-      name: 'Maria Santos',
-      email: 'campo@construcao.com',
-      password: 'campo123',
-      role: 'worker' as const,
-      sites: ['1'],
-      phone: '(11) 98765-4321'
-    }
-  ];
-
-  private demoSites = [
-    {
-      id: '1',
-      name: 'Edifício Residencial Vila Nova',
-      address: 'Rua das Flores, 123 - Centro'
-    },
-    {
-      id: '2',
-      name: 'Complexo Comercial Plaza',
-      address: 'Av. Paulista, 456 - Bela Vista'
-    },
-    {
-      id: '3',
-      name: 'Condomínio Jardim Primavera',
-      address: 'Rua dos Pinheiros, 789 - Jardins'
-    }
-  ];
-
-  private demoInvites: Invite[] = [];
-
-  async login(email: string, password: string): Promise<boolean> {
+  static async isAuthenticated(): Promise<boolean> {
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      const user = userCredential.user;
-      
-      // Buscar dados adicionais do usuário no Firestore
-      const userDoc = await getDoc(doc(db, 'users', user.uid));
-      if (!userDoc.exists()) {
-        throw new Error('Usuário não encontrado');
+      const userData = await AsyncStorage.getItem(this.USER_KEY);
+      return !!userData;
+    } catch (error) {
+      console.error('Erro ao verificar autenticação:', error);
+      return false;
+    }
+  }
+
+  static async getCurrentUser(): Promise<User | null> {
+    try {
+      console.log('Obtendo usuário atual...');
+      const userData = await AsyncStorage.getItem(this.USER_KEY);
+      console.log('Dados do usuário:', userData);
+
+      if (!userData) {
+        console.log('Nenhum usuário encontrado');
+        return null;
       }
 
-      const userData = userDoc.data() as User;
-      
-      await AsyncStorage.setItem(this.AUTH_KEY, 'authenticated');
-      await AsyncStorage.setItem(this.USER_KEY, JSON.stringify(userData));
-      return true;
+      const user = JSON.parse(userData);
+      console.log('Usuário carregado:', user);
+      return user;
     } catch (error) {
-      console.error('Login error:', error);
+      console.error('Erro ao obter usuário atual:', error);
+      return null;
+    }
+  }
+
+  static async getCurrentSite(): Promise<Site | null> {
+    try {
+      const siteData = await AsyncStorage.getItem(this.SITE_KEY);
+      return siteData ? JSON.parse(siteData) : null;
+    } catch (error) {
+      console.error('Erro ao obter canteiro atual:', error);
+      return null;
+    }
+  }
+
+  static async setCurrentSite(site: Site | null): Promise<void> {
+    try {
+      if (site) {
+        await AsyncStorage.setItem(this.SITE_KEY, JSON.stringify(site));
+      } else {
+        await AsyncStorage.removeItem(AuthService.SITE_KEY);
+      }
+    } catch (error) {
+      console.error('Erro ao definir canteiro atual:', error);
+      throw error;
+    }
+  }
+
+  static async login(email: string, password: string): Promise<boolean> {
+    try {
+      console.log('Tentando login com:', email);
+      // Simulação de autenticação
+      if (email === 'admin@construcao.com' && password === 'admin123') {
+        const user = {
+          id: '1',
+          name: 'João Silva',
+          email: 'admin@construcao.com',
+          role: 'admin',
+        };
+        await AsyncStorage.setItem(this.USER_KEY, JSON.stringify(user));
+        console.log('Login bem-sucedido:', user);
+        return true;
+      }
       return false;
+    } catch (error) {
+      console.error('Erro no login:', error);
+      return false;
+    }
+  }
+
+  static async logout(): Promise<void> {
+    try {
+      console.log('Fazendo logout...');
+      await AsyncStorage.removeItem(AuthService.USER_KEY);
+      await AsyncStorage.removeItem(AuthService.SITE_KEY);
+      console.log('Logout concluído');
+    } catch (error) {
+      console.error('Erro ao fazer logout:', error);
+      throw error;
     }
   }
 
@@ -118,9 +140,12 @@ class AuthenticationService {
     role: 'admin' | 'worker';
     phone?: string;
     company?: string;
+    siteName?: string;
     inviteId?: string;
   }): Promise<boolean> {
     try {
+      let invite: Invite | undefined;
+
       // Se for trabalhador, verificar convite
       if (userData.role === 'worker') {
         if (!userData.inviteId) {
@@ -132,14 +157,14 @@ class AuthenticationService {
           throw new Error('Convite inválido ou expirado');
         }
 
-        const invite = inviteDoc.data() as Invite;
+        invite = inviteDoc.data() as Invite;
         if (invite.status !== 'pending' || invite.email !== userData.email) {
           throw new Error('Convite inválido ou expirado');
         }
 
         // Marcar convite como aceito
         await updateDoc(doc(db, 'invites', userData.inviteId), {
-          status: 'accepted'
+          status: 'accepted',
         });
       }
 
@@ -150,6 +175,20 @@ class AuthenticationService {
         userData.password
       );
 
+      // Se for admin, criar a obra
+      let siteId = '';
+      if (userData.role === 'admin' && userData.siteName) {
+        const siteRef = doc(collection(db, 'sites'));
+        siteId = siteRef.id;
+        await setDoc(siteRef, {
+          id: siteId,
+          name: userData.siteName,
+          address: '',
+          createdBy: userCredential.user.uid,
+          createdAt: new Date().toISOString(),
+        });
+      }
+
       // Criar documento do usuário no Firestore
       const user: User = {
         id: userCredential.user.uid,
@@ -158,24 +197,29 @@ class AuthenticationService {
         role: userData.role,
         phone: userData.phone,
         company: userData.company,
-        sites: userData.role === 'admin' ? [] : [invite?.siteId || '']
+        sites: userData.role === 'admin' ? [siteId] : [invite?.siteId || ''],
       };
 
       await setDoc(doc(db, 'users', user.id), user);
 
-      // Fazer login automático
-      await AsyncStorage.setItem(this.AUTH_KEY, 'authenticated');
-      await AsyncStorage.setItem(this.USER_KEY, JSON.stringify(user));
+      // Fazer logout para garantir que o usuário faça login novamente
+      await signOut(auth);
+      await AsyncStorage.removeItem(AuthService.USER_KEY);
+      await AsyncStorage.removeItem(AuthService.SITE_KEY);
+
       return true;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Register error:', error);
+      if (error.code === 'auth/email-already-in-use') {
+        throw new Error('Email já está em uso');
+      }
       throw error;
     }
   }
 
   async createInvite(email: string, siteId: string): Promise<Invite> {
     try {
-      const currentUser = await this.getCurrentUser();
+      const currentUser = await AuthService.getCurrentUser();
       if (!currentUser || currentUser.role !== 'admin') {
         throw new Error('Apenas administradores podem criar convites');
       }
@@ -187,7 +231,7 @@ class AuthenticationService {
         where('status', '==', 'pending')
       );
       const existingInvites = await getDocs(invitesQuery);
-      
+
       if (!existingInvites.empty) {
         throw new Error('Já existe um convite pendente para este email');
       }
@@ -198,7 +242,7 @@ class AuthenticationService {
         siteId,
         createdAt: new Date().toISOString(),
         status: 'pending',
-        invitedBy: currentUser.id
+        invitedBy: currentUser.id,
       };
 
       await setDoc(doc(db, 'invites', invite.id), invite);
@@ -211,7 +255,7 @@ class AuthenticationService {
 
   async getInvites(): Promise<Invite[]> {
     try {
-      const currentUser = await this.getCurrentUser();
+      const currentUser = await AuthService.getCurrentUser();
       if (!currentUser) return [];
 
       let invitesQuery;
@@ -225,7 +269,7 @@ class AuthenticationService {
       }
 
       const invitesSnapshot = await getDocs(invitesQuery);
-      return invitesSnapshot.docs.map(doc => doc.data() as Invite);
+      return invitesSnapshot.docs.map((doc) => doc.data() as Invite);
     } catch (error) {
       console.error('Get invites error:', error);
       return [];
@@ -245,84 +289,47 @@ class AuthenticationService {
     }
   }
 
-  async logout(): Promise<void> {
-    try {
-      await signOut(auth);
-      await AsyncStorage.removeItem(this.AUTH_KEY);
-      await AsyncStorage.removeItem(this.USER_KEY);
-      await AsyncStorage.removeItem(this.SITE_KEY);
-    } catch (error) {
-      console.error('Logout error:', error);
-      throw error;
-    }
-  }
+  // Demo users and sites for testing purposes
+  private demoUsers: User[] = [
+    {
+      id: '1',
+      name: 'João Silva',
+      email: 'admin@construcao.com',
+      role: 'admin',
+      sites: ['site1'],
+    },
+    {
+      id: '2',
+      name: 'Maria Souza',
+      email: 'worker@construcao.com',
+      role: 'worker',
+      sites: ['site1'],
+    },
+  ];
 
-  async isAuthenticated(): Promise<boolean> {
-    try {
-      const token = await AsyncStorage.getItem(this.AUTH_KEY);
-      return token === 'authenticated';
-    } catch (error) {
-      return false;
-    }
-  }
+  private demoSites: Site[] = [
+    {
+      id: 'site1',
+      name: 'Obra Central',
+      address: 'Rua Principal, 123',
+    },
+  ];
 
-  async getCurrentUser(): Promise<User | null> {
-    try {
-      const userJson = await AsyncStorage.getItem(this.USER_KEY);
-      return userJson ? JSON.parse(userJson) : null;
-    } catch (error) {
-      console.error('Get current user error:', error);
-      return null;
-    }
-  }
-
-  async getUserRole(): Promise<'admin' | 'worker' | null> {
-    try {
-      const user = await this.getCurrentUser();
-      return user?.role || null;
-    } catch (error) {
-      console.error('Get user role error:', error);
-      return null;
-    }
-  }
-
-  async setCurrentSite(site: { id: string; name: string }): Promise<void> {
-    try {
-      await AsyncStorage.setItem(this.SITE_KEY, JSON.stringify(site));
-    } catch (error) {
-      console.error('Set current site error:', error);
-      throw error;
-    }
-  }
-
-  async getCurrentSite(): Promise<{ id: string; name: string } | null> {
-    try {
-      const siteJson = await AsyncStorage.getItem(this.SITE_KEY);
-      return siteJson ? JSON.parse(siteJson) : null;
-    } catch (error) {
-      console.error('Get current site error:', error);
-      return null;
-    }
-  }
-
-  async getUserSites(): Promise<Site[]> {
-    try {
-      const user = await this.getCurrentUser();
-      if (!user) return [];
-
-      const demoUser = this.demoUsers.find(u => u.id === user.id);
-      if (!demoUser) return [];
-
-      return this.demoSites.filter(site => demoUser.sites.includes(site.id));
-    } catch (error) {
-      return [];
-    }
+  static async getUserSites(): Promise<
+    { id: string; name: string; address: string }[]
+  > {
+    // Exemplo de retorno fake
+    return [
+      { id: '1', name: 'Obra Centro', address: 'Rua A, 123' },
+      { id: '2', name: 'Obra Norte', address: 'Av. B, 456' },
+      { id: '3', name: 'Obra Sul', address: 'Rua C, 789' },
+    ];
   }
 
   async getUserProfile() {
-    const user = await this.getCurrentUser();
-    const site = await this.getCurrentSite();
-    
+    const user = await AuthService.getCurrentUser();
+    const site = await AuthService.getCurrentSite();
+
     if (!user) throw new Error('User not found');
 
     return {
@@ -332,9 +339,13 @@ class AuthenticationService {
       phone: user.phone,
       company: user.company,
       siteName: site?.name || 'Nenhuma obra selecionada',
-      joinDate: '2024-01-15'
+      joinDate: '2024-01-15',
     };
   }
-}
 
-export const AuthService = new AuthenticationService();
+  static getUserRole(): 'admin' | 'worker' {
+    // Replace this with your actual logic to get the user role
+    // For example, from AsyncStorage, a global variable, or a user object
+    return 'worker'; // or 'admin'
+  }
+}

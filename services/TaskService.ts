@@ -1,3 +1,5 @@
+import { AuthService } from './AuthService';
+
 interface Task {
   id: string;
   title: string;
@@ -9,6 +11,7 @@ interface Task {
   createdAt: string;
   photos: string[];
   area: string;
+  siteId: string;
 }
 
 class TaskManagementService {
@@ -23,7 +26,8 @@ class TaskManagementService {
       dueDate: '2024-01-20',
       createdAt: '2024-01-15',
       photos: [],
-      area: 'Canteiro'
+      area: 'Canteiro',
+      siteId: '1'
     },
     {
       id: '2',
@@ -35,7 +39,8 @@ class TaskManagementService {
       dueDate: '2024-01-22',
       createdAt: '2024-01-16',
       photos: ['https://images.pexels.com/photos/159306/construction-site-build-construction-work-159306.jpeg'],
-      area: 'Almoxarifado'
+      area: 'Almoxarifado',
+      siteId: '1'
     },
     {
       id: '3',
@@ -47,7 +52,8 @@ class TaskManagementService {
       dueDate: '2024-01-18',
       createdAt: '2024-01-14',
       photos: ['https://images.pexels.com/photos/209274/pexels-photo-209274.jpeg'],
-      area: 'Instalações'
+      area: 'Instalações',
+      siteId: '1'
     },
     {
       id: '4',
@@ -59,7 +65,8 @@ class TaskManagementService {
       dueDate: '2024-01-25',
       createdAt: '2024-01-17',
       photos: [],
-      area: 'Área Externa'
+      area: 'Área Externa',
+      siteId: '1'
     },
     {
       id: '5',
@@ -71,21 +78,45 @@ class TaskManagementService {
       dueDate: '2024-01-21',
       createdAt: '2024-01-16',
       photos: [],
-      area: 'Escritório'
+      area: 'Escritório',
+      siteId: '1'
     }
   ];
 
   async getTasks(): Promise<Task[]> {
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 500));
-    return [...this.demoTasks];
+    try {
+      console.log('Obtendo canteiro atual...');
+      const currentSite = await AuthService.getCurrentSite();
+      console.log('Canteiro atual:', currentSite);
+
+      if (!currentSite) {
+        console.error('Nenhum canteiro selecionado');
+        return [];
+      }
+
+      // Simulate API delay
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      const tasks = this.demoTasks.filter(task => task.siteId === currentSite.id);
+      console.log('Tarefas filtradas:', tasks);
+      return tasks;
+    } catch (error) {
+      console.error('Erro ao carregar tarefas:', error);
+      return [];
+    }
   }
 
   async createTask(taskData: Omit<Task, 'id' | 'createdAt'>): Promise<Task> {
+    const currentSite = await AuthService.getCurrentSite();
+    if (!currentSite) {
+      throw new Error('Nenhum canteiro selecionado');
+    }
+
     const newTask: Task = {
       ...taskData,
       id: Date.now().toString(),
       createdAt: new Date().toISOString(),
+      siteId: currentSite.id
     };
     
     this.demoTasks.unshift(newTask);

@@ -1,5 +1,14 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, KeyboardAvoidingView, Platform } from 'react-native';
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+} from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Building2, User, Lock } from 'lucide-react-native';
@@ -18,13 +27,20 @@ export default function LoginScreen() {
 
     setLoading(true);
     try {
+      console.log('Tentando fazer login...');
       const success = await AuthService.login(email.trim(), password);
+      console.log('Resultado do login:', success);
+
       if (success) {
+        // Limpar canteiro atual ao fazer login
+        await AuthService.setCurrentSite(null);
+        console.log('Redirecionando para seleção de canteiro');
         router.replace('/(auth)/site-selection');
       } else {
         Alert.alert('Erro', 'Credenciais inválidas. Tente novamente.');
       }
     } catch (error) {
+      console.error('Erro ao fazer login:', error);
       Alert.alert('Erro', 'Erro ao fazer login. Tente novamente.');
     } finally {
       setLoading(false);
@@ -33,16 +49,27 @@ export default function LoginScreen() {
 
   const handleDemoLogin = async (role: 'admin' | 'worker') => {
     setLoading(true);
-    const demoCredentials = role === 'admin' 
-      ? { email: 'admin@construcao.com', password: 'admin123' }
-      : { email: 'campo@construcao.com', password: 'campo123' };
-    
+    const demoCredentials =
+      role === 'admin'
+        ? { email: 'admin@construcao.com', password: 'admin123' }
+        : { email: 'campo@construcao.com', password: 'campo123' };
+
     try {
-      const success = await AuthService.login(demoCredentials.email, demoCredentials.password);
+      console.log('Tentando login demo...');
+      const success = await AuthService.login(
+        demoCredentials.email,
+        demoCredentials.password
+      );
+      console.log('Resultado do login demo:', success);
+
       if (success) {
+        // Limpar canteiro atual ao fazer login
+        await AuthService.setCurrentSite(null);
+        console.log('Redirecionando para seleção de canteiro');
         router.replace('/(auth)/site-selection');
       }
     } catch (error) {
+      console.error('Erro ao fazer login demo:', error);
       Alert.alert('Erro', 'Erro ao fazer login demo.');
     } finally {
       setLoading(false);
@@ -52,14 +79,14 @@ export default function LoginScreen() {
   const handleRegister = (role: 'admin' | 'worker') => {
     router.push({
       pathname: '/(auth)/register',
-      params: { role }
+      params: { role },
     });
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      <KeyboardAvoidingView 
-        style={styles.keyboardView} 
+      <KeyboardAvoidingView
+        style={styles.keyboardView}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <View style={styles.header}>
@@ -96,8 +123,8 @@ export default function LoginScreen() {
             />
           </View>
 
-          <TouchableOpacity 
-            style={[styles.loginButton, loading && styles.buttonDisabled]} 
+          <TouchableOpacity
+            style={[styles.loginButton, loading && styles.buttonDisabled]}
             onPress={handleLogin}
             disabled={loading}
           >
@@ -108,33 +135,37 @@ export default function LoginScreen() {
 
           <View style={styles.registerSection}>
             <Text style={styles.registerTitle}>Novo por aqui?</Text>
-            <TouchableOpacity 
-              style={styles.registerButton} 
+            <TouchableOpacity
+              style={styles.registerButton}
               onPress={() => handleRegister('admin')}
               disabled={loading}
             >
-              <Text style={styles.registerButtonText}>Cadastrar como Administrador</Text>
+              <Text style={styles.registerButtonText}>
+                Cadastrar como Administrador
+              </Text>
             </TouchableOpacity>
-            <TouchableOpacity 
-              style={styles.registerButton} 
+            <TouchableOpacity
+              style={styles.registerButton}
               onPress={() => handleRegister('worker')}
               disabled={loading}
             >
-              <Text style={styles.registerButtonText}>Cadastrar como Trabalhador</Text>
+              <Text style={styles.registerButtonText}>
+                Cadastrar como Trabalhador
+              </Text>
             </TouchableOpacity>
           </View>
 
           <View style={styles.demoSection}>
             <Text style={styles.demoTitle}>Acesso Demo:</Text>
-            <TouchableOpacity 
-              style={styles.demoButton} 
+            <TouchableOpacity
+              style={styles.demoButton}
               onPress={() => handleDemoLogin('admin')}
               disabled={loading}
             >
               <Text style={styles.demoButtonText}>Administrador</Text>
             </TouchableOpacity>
-            <TouchableOpacity 
-              style={styles.demoButton} 
+            <TouchableOpacity
+              style={styles.demoButton}
               onPress={() => handleDemoLogin('worker')}
               disabled={loading}
             >
@@ -142,6 +173,7 @@ export default function LoginScreen() {
             </TouchableOpacity>
           </View>
         </View>
+        <View style={{ pointerEvents: 'none' }} />
       </KeyboardAvoidingView>
     </SafeAreaView>
   );

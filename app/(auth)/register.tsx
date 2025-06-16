@@ -14,6 +14,7 @@ export default function RegisterScreen() {
     confirmPassword: '',
     phone: '',
     company: '',
+    siteName: '',
     inviteCode: inviteId || '',
   });
   const [loading, setLoading] = useState(false);
@@ -26,6 +27,11 @@ export default function RegisterScreen() {
 
     if (formData.password !== formData.confirmPassword) {
       Alert.alert('Erro', 'As senhas não coincidem.');
+      return;
+    }
+
+    if (role === 'admin' && !formData.siteName.trim()) {
+      Alert.alert('Erro', 'Por favor, informe o nome da obra.');
       return;
     }
 
@@ -56,20 +62,34 @@ export default function RegisterScreen() {
         role,
         phone: formData.phone.trim(),
         company: formData.company.trim(),
+        siteName: formData.siteName.trim(),
         inviteId: formData.inviteCode.trim()
       });
 
       Alert.alert(
-        'Sucesso',
-        'Cadastro realizado com sucesso!',
+        'Sucesso!',
+        'Cadastro concluído com sucesso! Você será redirecionado para a tela de login.',
         [
           {
             text: 'OK',
-            onPress: () => router.replace('/(auth)/site-selection')
+            onPress: () => {
+              setFormData({
+                name: '',
+                email: '',
+                password: '',
+                confirmPassword: '',
+                phone: '',
+                company: '',
+                siteName: '',
+                inviteCode: ''
+              });
+              router.replace('/(auth)/login');
+            }
           }
         ]
       );
     } catch (error) {
+      console.error('Register error:', error);
       if (error instanceof Error) {
         if (error.message === 'Email já está em uso') {
           Alert.alert('Erro', 'Este e-mail já está cadastrado.');
@@ -146,16 +166,29 @@ export default function RegisterScreen() {
             </View>
 
             {role === 'admin' && (
-              <View style={styles.inputContainer}>
-                <Building2 size={20} color="#666666" style={styles.inputIcon} />
-                <TextInput
-                  style={styles.input}
-                  placeholder="Nome da empresa"
-                  value={formData.company}
-                  onChangeText={(text) => setFormData({ ...formData, company: text })}
-                  placeholderTextColor="#999999"
-                />
-              </View>
+              <>
+                <View style={styles.inputContainer}>
+                  <Building2 size={20} color="#666666" style={styles.inputIcon} />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Nome da empresa"
+                    value={formData.company}
+                    onChangeText={(text) => setFormData({ ...formData, company: text })}
+                    placeholderTextColor="#999999"
+                  />
+                </View>
+
+                <View style={styles.inputContainer}>
+                  <Building2 size={20} color="#666666" style={styles.inputIcon} />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Nome da obra"
+                    value={formData.siteName}
+                    onChangeText={(text) => setFormData({ ...formData, siteName: text })}
+                    placeholderTextColor="#999999"
+                  />
+                </View>
+              </>
             )}
 
             {role === 'worker' && (
