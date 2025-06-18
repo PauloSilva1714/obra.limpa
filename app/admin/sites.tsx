@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { Plus, Edit, Trash2, ArrowLeft } from 'lucide-react-native';
-import AuthService from '@/services/AuthService';
+import { AuthService } from '@/services/AuthService';
 import TaskService from '@/services/TaskService';
 
 interface Site {
@@ -33,7 +33,7 @@ export default function SitesScreen() {
   const loadSites = async () => {
     try {
       setLoading(true);
-      const sitesData = await AuthService.getSites();
+      const sitesData = await AuthService.getUserSites();
       const sitesWithStats = await Promise.all(
         sitesData.map(async (site) => {
           const tasks = await TaskService.getTasksBySite(site.id);

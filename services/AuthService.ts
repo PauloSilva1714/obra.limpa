@@ -39,6 +39,7 @@ export interface Site {
   status: 'active' | 'inactive';
   createdAt: string;
   updatedAt: string;
+  createdBy?: string;
 }
 
 export interface Invite {
@@ -51,7 +52,7 @@ export interface Invite {
 
 export class AuthService {
   private static USER_KEY = 'user';
-  static SITE_KEY = 'sua-chave-aqui';
+  static SITE_KEY = 'selectedSite';
   private static instance: AuthService;
   private currentUser: User | null = null;
 
@@ -363,15 +364,27 @@ export class AuthService {
     },
   ];
 
-  static async getUserSites(): Promise<
-    { id: string; name: string; address: string }[]
-  > {
-    // Exemplo de retorno fake
-    return [
-      { id: '1', name: 'Obra Centro', address: 'Rua A, 123' },
-      { id: '2', name: 'Obra Norte', address: 'Av. B, 456' },
-      { id: '3', name: 'Obra Sul', address: 'Rua C, 789' },
-    ];
+  static async getUserSites(): Promise<Site[]> {
+    try {
+      const currentUser = await this.getCurrentUser();
+      if (!currentUser) {
+        throw new Error('Usuário não autenticado');
+      }
+
+      const sitesQuery = query(
+        collection(db, 'sites'),
+        where('createdBy', '==', currentUser.id)
+      );
+      const sitesSnapshot = await getDocs(sitesQuery);
+      
+      return sitesSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      } as Site));
+    } catch (error) {
+      console.error('Erro ao obter obras do usuário:', error);
+      throw error;
+    }
   }
 
   async getUserProfile() {
@@ -536,21 +549,64 @@ export class AuthService {
 
   static async updateSite(siteId: string, updates: Partial<Site>): Promise<void> {
     try {
+      const currentUser = await this.getCurrentUser();
+      if (!currentUser || currentUser.role !== 'admin') {
+        throw new Error('Apenas administradores podem atualizar obras');
+      }
+
+      // Verificar se a obra pertence ao usuário
+      const siteDoc = await getDoc(doc(db, 'sites', siteId));
+      if (!siteDoc.exists()) {
+        throw new Error('Obra não encontrada');
+      }
+
+      const siteData = siteDoc.data() as Site;
+      if (siteData.createdBy !== currentUser.id) {
+        throw new Error('Você não tem permissão para atualizar esta obra');
+      }
+
+      // Atualizar a obra
       await updateDoc(doc(db, 'sites', siteId), {
         ...updates,
-        updatedAt: serverTimestamp(),
+        updatedAt: new Date().toISOString()
       });
     } catch (error) {
-      console.error('Erro ao atualizar canteiro:', error);
+      console.error('Erro ao atualizar obra:', error);
       throw error;
     }
   }
 
   static async deleteSite(siteId: string): Promise<void> {
     try {
+      const currentUser = await this.getCurrentUser();
+      if (!currentUser || currentUser.role !== 'admin') {
+        throw new Error('Apenas administradores podem excluir obras');
+      }
+
+      // Verificar se a obra pertence ao usuário
+      const siteDoc = await getDoc(doc(db, 'sites', siteId));
+      if (!siteDoc.exists()) {
+        throw new Error('Obra não encontrada');
+      }
+
+      const siteData = siteDoc.data() as Site;
+      if (siteData.createdBy !== currentUser.id) {
+        throw new Error('Você não tem permissão para excluir esta obra');
+      }
+
+      // Excluir a obra
       await deleteDoc(doc(db, 'sites', siteId));
+
+      // Atualizar a lista de obras do usuário
+      const userRef = doc(db, 'users', currentUser.id);
+      const userDoc = await getDoc(userRef);
+      if (userDoc.exists()) {
+        const userData = userDoc.data() as User;
+        const updatedSites = userData.sites?.filter(id => id !== siteId) || [];
+        await updateDoc(userRef, { sites: updatedSites });
+      }
     } catch (error) {
-      console.error('Erro ao deletar canteiro:', error);
+      console.error('Erro ao excluir obra:', error);
       throw error;
     }
   }

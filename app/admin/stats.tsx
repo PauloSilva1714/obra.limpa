@@ -1,180 +1,136 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
-  ActivityIndicator,
-  RefreshControl,
+  TouchableOpacity,
   SafeAreaView,
-  Alert,
 } from 'react-native';
-import { useColorScheme } from 'react-native';
-import TaskService from '@/services/TaskService';
+import { router } from 'expo-router';
+import { ArrowLeft, Users, ClipboardCheck, Clock, AlertCircle } from 'lucide-react-native';
 import { AuthService } from '@/services/AuthService';
-import { formatDistanceToNow } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
+import TaskService from '@/services/TaskService';
+
+// Define Task type with status property
+type Task = {
+  status: string;
+  // add other properties if needed
+};
 
 interface Stats {
-  tasks: {
-    total: number;
-    completed: number;
-    pending: number;
-    overdue: number;
-    completionRate: number;
-    averageCompletionTime: number;
-  };
-  workers: {
-    total: number;
-    active: number;
-  };
+  totalWorkers: number;
+  activeWorkers: number;
+  totalTasks: number;
+  completedTasks: number;
+  pendingTasks: number;
+  inProgressTasks: number;
 }
 
 export default function StatsScreen() {
-  const [stats, setStats] = useState<Stats | null>(null);
+  const [stats, setStats] = useState<Stats>({
+    totalWorkers: 0,
+    activeWorkers: 0,
+    totalTasks: 0,
+    completedTasks: 0,
+    pendingTasks: 0,
+    inProgressTasks: 0,
+  });
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
-
-  const loadStats = async () => {
-    try {
-      setLoading(true);
-      // Carrega todas as tarefas
-      const tasks = await TaskService.getTasks();
-      const workers = await AuthService.getInstance().getWorkers();
-
-      // Calcula estatísticas de tarefas
-      const totalTasks = tasks.length;
-      const completedTasks = tasks.filter(task => task.status === 'completed').length;
-      const pendingTasks = tasks.filter(task => task.status === 'pending').length;
-      const overdueTasks = tasks.filter(task => {
-        if (task.status === 'completed' || !task.dueDate) return false;
-        return new Date(task.dueDate) < new Date();
-      }).length;
-
-      // Calcula taxa de conclusão
-      const completionRate = totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0;
-
-      // Calcula tempo médio de conclusão
-      const completionTimes = tasks
-        .filter(task => !!task.completedAt && !!task.createdAt)
-        .map(task => {
-          const start = new Date(task.createdAt as string);
-          const end = new Date(task.completedAt as string);
-          return end.getTime() - start.getTime();
-        });
-
-      const averageCompletionTime = completionTimes.length > 0
-        ? completionTimes.reduce((a, b) => a + b, 0) / completionTimes.length
-        : 0;
-
-      // Calcula estatísticas de trabalhadores
-      const totalWorkers = workers.length;
-      const activeWorkers = workers.filter(worker => worker.status === 'active').length;
-
-      setStats({
-        tasks: {
-          total: totalTasks,
-          completed: completedTasks,
-          pending: pendingTasks,
-          overdue: overdueTasks,
-          completionRate,
-          averageCompletionTime,
-        },
-        workers: {
-          total: totalWorkers,
-          active: activeWorkers,
-        },
-      });
-    } catch (error) {
-      console.error('Erro ao carregar estatísticas:', error);
-      Alert.alert('Erro', 'Não foi possível carregar as estatísticas.');
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
 
   useEffect(() => {
     loadStats();
   }, []);
 
-  const onRefresh = () => {
-    setRefreshing(true);
-    loadStats();
+  const loadStats = async () => {
+    try {
+      setLoading(true);
+      const workers = await AuthService.getInstance().getWorkers();
+      const tasks = await TaskService.getInstance.getTasks();
+
+      const completedTasks = tasks.filter((task: Task) => task.status === 'completed');
+      const pendingTasks = tasks.filter((task: Task) => task.status === 'pending');
+      const inProgressTasks = tasks.filter((task: Task) => task.status === 'in_progress');
+
+      setStats({
+        totalWorkers: workers.length,
+        activeWorkers: workers.filter(worker => worker.status === 'active').length,
+        totalTasks: tasks.length,
+        completedTasks: completedTasks.length,
+        pendingTasks: pendingTasks.length,
+        inProgressTasks: inProgressTasks.length,
+      });
+    } catch (error) {
+      console.error('Erro ao carregar estatísticas:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const StatCard = ({ title, value, subtitle }: { title: string; value: string | number; subtitle?: string }) => (
-    <View style={[styles.card, isDark && styles.cardDark]}>
-      <Text style={[styles.cardTitle, isDark && styles.textDark]}>{title}</Text>
-      <Text style={[styles.cardValue, isDark && styles.textDark]}>{value}</Text>
-      {subtitle && <Text style={[styles.cardSubtitle, isDark && styles.textDark]}>{subtitle}</Text>}
+  const StatCard = ({ icon: Icon, value, title }: { icon: any; value: number; title: string }) => (
+    <View style={styles.statCard}>
+      <Icon size={24} color="#2196F3" />
+      <Text style={styles.statValue}>{value}</Text>
+      <Text style={styles.statTitle}>{title}</Text>
     </View>
   );
 
-  if (loading && !refreshing) {
-    return (
-      <SafeAreaView style={[styles.container, isDark && styles.containerDark]}>
-        <ActivityIndicator size="large" color="#007AFF" />
-      </SafeAreaView>
-    );
-  }
-
   return (
-    <SafeAreaView style={[styles.container, isDark && styles.containerDark]}>
-      <ScrollView
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
-      >
-        <Text style={[styles.sectionTitle, isDark && styles.textDark]}>Estatísticas de Tarefas</Text>
-        <View style={styles.statsGrid}>
-          <StatCard
-            title="Total de Tarefas"
-            value={stats?.tasks.total || 0}
-          />
-          <StatCard
-            title="Tarefas Concluídas"
-            value={stats?.tasks.completed || 0}
-          />
-          <StatCard
-            title="Tarefas Pendentes"
-            value={stats?.tasks.pending || 0}
-          />
-          <StatCard
-            title="Tarefas Atrasadas"
-            value={stats?.tasks.overdue || 0}
-          />
-        </View>
+    <SafeAreaView style={styles.container}>
+      <View style={styles.header}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => router.back()}
+        >
+          <ArrowLeft size={24} color="#000" />
+        </TouchableOpacity>
+        <Text style={styles.title}>Estatísticas</Text>
+      </View>
 
-        <Text style={[styles.sectionTitle, isDark && styles.textDark]}>Métricas de Desempenho</Text>
-        <View style={styles.statsGrid}>
-          <StatCard
-            title="Taxa de Conclusão"
-            value={`${stats?.tasks.completionRate.toFixed(1)}%`}
-          />
-          <StatCard
-            title="Tempo Médio"
-            value={stats?.tasks.averageCompletionTime ? formatDistanceToNow(
-              new Date(stats.tasks.averageCompletionTime),
-              { locale: ptBR }
-            ) : 'N/A'}
-          />
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <Text>Carregando...</Text>
         </View>
+      ) : (
+        <View style={styles.content}>
+          <Text style={styles.sectionTitle}>Trabalhadores</Text>
+          <View style={styles.statsGrid}>
+            <StatCard
+              icon={Users}
+              value={stats.totalWorkers}
+              title="Total"
+            />
+            <StatCard
+              icon={Users}
+              value={stats.activeWorkers}
+              title="Ativos"
+            />
+          </View>
 
-        <Text style={[styles.sectionTitle, isDark && styles.textDark]}>Estatísticas de Trabalhadores</Text>
-        <View style={styles.statsGrid}>
-          <StatCard
-            title="Total de Trabalhadores"
-            value={stats?.workers.total || 0}
-          />
-          <StatCard
-            title="Trabalhadores Ativos"
-            value={stats?.workers.active || 0}
-          />
+          <Text style={styles.sectionTitle}>Tarefas</Text>
+          <View style={styles.statsGrid}>
+            <StatCard
+              icon={ClipboardCheck}
+              value={stats.totalTasks}
+              title="Total"
+            />
+            <StatCard
+              icon={ClipboardCheck}
+              value={stats.completedTasks}
+              title="Concluídas"
+            />
+            <StatCard
+              icon={Clock}
+              value={stats.inProgressTasks}
+              title="Em Andamento"
+            />
+            <StatCard
+              icon={AlertCircle}
+              value={stats.pendingTasks}
+              title="Pendentes"
+            />
+          </View>
         </View>
-      </ScrollView>
+      )}
     </SafeAreaView>
   );
 }
@@ -184,48 +140,60 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f5f5f5',
   },
-  containerDark: {
-    backgroundColor: '#000',
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
   },
-  sectionTitle: {
+  backButton: {
+    padding: 8,
+  },
+  title: {
     fontSize: 20,
     fontWeight: 'bold',
-    marginHorizontal: 16,
-    marginTop: 24,
+    marginLeft: 16,
+  },
+  content: {
+    padding: 16,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
     marginBottom: 16,
-    color: '#1F2937',
+    marginTop: 24,
   },
   statsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    padding: 8,
+    marginHorizontal: -8,
   },
-  card: {
+  statCard: {
     backgroundColor: '#fff',
     borderRadius: 8,
     padding: 16,
-    marginBottom: 12,
+    margin: 8,
+    flex: 1,
+    minWidth: '45%',
+    alignItems: 'center',
     boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.1)',
   },
-  cardDark: {
-    backgroundColor: '#1F2937',
-  },
-  cardTitle: {
-    fontSize: 14,
-    color: '#6B7280',
-    marginBottom: 8,
-  },
-  cardValue: {
+  statValue: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#1F2937',
-    marginBottom: 4,
+    color: '#2196F3',
+    marginTop: 8,
   },
-  cardSubtitle: {
-    fontSize: 12,
-    color: '#6B7280',
+  statTitle: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 4,
   },
-  textDark: {
-    color: '#F3F4F6',
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 }); 

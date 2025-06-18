@@ -13,6 +13,7 @@ import {
   orderBy,
 } from 'firebase/firestore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { AuthService } from './AuthService';
 
 export interface Task {
   id: string;
@@ -45,14 +46,14 @@ class TaskService {
 
   async getTasks(): Promise<Task[]> {
     try {
-      const siteId = await AsyncStorage.getItem('selectedSite');
-      if (!siteId) {
+      const currentSite = await AuthService.getCurrentSite();
+      if (!currentSite) {
         throw new Error('Nenhuma obra selecionada');
       }
 
       const tasksQuery = query(
         collection(db, 'tasks'),
-        where('siteId', '==', siteId),
+        where('siteId', '==', currentSite.id),
         orderBy('createdAt', 'desc')
       );
       const snapshot = await getDocs(tasksQuery);
@@ -73,24 +74,31 @@ class TaskService {
     task: Omit<Task, 'id' | 'createdAt' | 'updatedAt'>
   ): Promise<Task> {
     try {
-      const siteId = await AsyncStorage.getItem('selectedSite');
-      if (!siteId) {
+      console.log('Criando nova tarefa:', task);
+      
+      const currentSite = await AuthService.getCurrentSite();
+      if (!currentSite) {
         throw new Error('Nenhuma obra selecionada');
       }
 
+      const now = new Date().toISOString();
       const newTask = {
         ...task,
-        siteId,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
+        siteId: currentSite.id,
+        createdAt: now,
+        updatedAt: now,
+        photos: task.photos || [],
+        status: task.status || 'pending',
+        priority: task.priority || 'medium',
       };
 
+      console.log('Dados da tarefa a serem salvos:', newTask);
       const docRef = await addDoc(collection(db, 'tasks'), newTask);
+      console.log('Tarefa criada com ID:', docRef.id);
+
       return {
         id: docRef.id,
         ...newTask,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
       };
     } catch (error) {
       console.error('Erro ao criar tarefa:', error);
@@ -112,9 +120,13 @@ class TaskService {
 
   async deleteTask(taskId: string): Promise<void> {
     try {
-      await deleteDoc(doc(db, 'tasks', taskId));
+      console.log('TaskService: Iniciando exclusão da tarefa:', taskId);
+      const taskRef = doc(db, 'tasks', taskId);
+      console.log('TaskService: Referência da tarefa criada');
+      await deleteDoc(taskRef);
+      console.log('TaskService: Tarefa excluída com sucesso');
     } catch (error) {
-      console.error('Erro ao deletar tarefa:', error);
+      console.error('TaskService: Erro ao deletar tarefa:', error);
       throw error;
     }
   }

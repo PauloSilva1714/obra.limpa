@@ -2,34 +2,46 @@ import React, { useState } from 'react';
 import {
   View,
   Text,
-  StyleSheet,
   TextInput,
   TouchableOpacity,
+  StyleSheet,
   Alert,
   SafeAreaView,
 } from 'react-native';
 import { router } from 'expo-router';
-import { ArrowLeft } from 'lucide-react-native';
-import AuthService from '@/services/AuthService';
+import { ArrowLeft, Mail } from 'lucide-react-native';
+import { AuthService } from '@/services/AuthService';
 
-export default function InviteScreen() {
+export default function InviteWorkerScreen() {
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleSendInvite = async () => {
+  const handleInvite = async () => {
     if (!email.trim()) {
-      Alert.alert('Erro', 'Por favor, digite o e-mail do trabalhador');
+      Alert.alert('Erro', 'Por favor, informe o e-mail do trabalhador.');
       return;
     }
 
+    setLoading(true);
     try {
-      setLoading(true);
       await AuthService.sendInvite(email.trim());
-      Alert.alert('Sucesso', 'Convite enviado com sucesso');
-      router.back();
+      Alert.alert(
+        'Sucesso',
+        'Convite enviado com sucesso!',
+        [
+          {
+            text: 'OK',
+            onPress: () => router.back(),
+          },
+        ]
+      );
     } catch (error) {
       console.error('Erro ao enviar convite:', error);
-      Alert.alert('Erro', 'Não foi possível enviar o convite');
+      if (error instanceof Error) {
+        Alert.alert('Erro', error.message);
+      } else {
+        Alert.alert('Erro', 'Não foi possível enviar o convite.');
+      }
     } finally {
       setLoading(false);
     }
@@ -44,28 +56,30 @@ export default function InviteScreen() {
         >
           <ArrowLeft size={24} color="#000" />
         </TouchableOpacity>
-        <Text style={styles.title}>Enviar Convite</Text>
+        <Text style={styles.title}>Convidar Trabalhador</Text>
         <View style={styles.placeholder} />
       </View>
 
       <View style={styles.form}>
         <View style={styles.inputGroup}>
           <Text style={styles.label}>E-mail do Trabalhador</Text>
-          <TextInput
-            style={styles.input}
-            value={email}
-            onChangeText={setEmail}
-            placeholder="Digite o e-mail do trabalhador"
-            placeholderTextColor="#999"
-            keyboardType="email-address"
-            autoCapitalize="none"
-            autoComplete="email"
-          />
+          <View style={styles.inputContainer}>
+            <Mail size={20} color="#666666" style={styles.inputIcon} />
+            <TextInput
+              style={styles.input}
+              placeholder="Digite o e-mail"
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              placeholderTextColor="#999999"
+            />
+          </View>
         </View>
 
         <TouchableOpacity
           style={[styles.button, loading && styles.buttonDisabled]}
-          onPress={handleSendInvite}
+          onPress={handleInvite}
           disabled={loading}
         >
           <Text style={styles.buttonText}>
@@ -113,13 +127,22 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     color: '#333',
   },
-  input: {
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: '#fff',
     borderRadius: 8,
     padding: 12,
-    fontSize: 16,
     borderWidth: 1,
     borderColor: '#e0e0e0',
+  },
+  inputIcon: {
+    marginRight: 12,
+  },
+  input: {
+    flex: 1,
+    fontSize: 16,
+    color: '#333',
   },
   button: {
     backgroundColor: '#2196F3',

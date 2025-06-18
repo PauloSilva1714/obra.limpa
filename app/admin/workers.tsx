@@ -9,17 +9,17 @@ import {
   SafeAreaView,
 } from 'react-native';
 import { router } from 'expo-router';
-import { Plus, Edit, Trash2, ArrowLeft, Mail } from 'lucide-react-native';
-import AuthService from '@/services/AuthService';
-import TaskService from '@/services/TaskService';
+import { Plus, Edit, Trash2, ArrowLeft, UserPlus } from 'lucide-react-native';
+import { AuthService } from '@/services/AuthService';
 
 interface Worker {
   id: string;
   name: string;
   email: string;
   status: 'active' | 'inactive';
-  tasksCount: number;
-  completedTasks: number;
+  phone?: string;
+  company?: string;
+  siteId?: string;
 }
 
 interface Invite {
@@ -42,23 +42,10 @@ export default function WorkersScreen() {
     try {
       setLoading(true);
       const [workersData, invitesData] = await Promise.all([
-        AuthService.getWorkers(),
-        AuthService.getInvites(),
+        AuthService.getInstance().getWorkers(),
+        AuthService.getInstance().getInvites(),
       ]);
-
-      const workersWithStats = await Promise.all(
-        workersData.map(async (worker) => {
-          const tasks = await TaskService.getTasksByWorker(worker.id);
-          const completedTasks = tasks.filter((task) => task.status === 'completed');
-          return {
-            ...worker,
-            tasksCount: tasks.length,
-            completedTasks: completedTasks.length,
-          };
-        })
-      );
-
-      setWorkers(workersWithStats);
+      setWorkers(workersData);
       setInvites(invitesData);
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
@@ -68,7 +55,7 @@ export default function WorkersScreen() {
     }
   };
 
-  const handleCreateInvite = () => {
+  const handleInvite = () => {
     router.push('/admin/workers/invite');
   };
 
@@ -93,7 +80,7 @@ export default function WorkersScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              await AuthService.removeWorker(workerId);
+              await AuthService.getInstance().removeWorker(workerId);
               await loadData();
               Alert.alert('Sucesso', 'Trabalhador removido com sucesso');
             } catch (error) {
@@ -108,19 +95,19 @@ export default function WorkersScreen() {
 
   const handleCancelInvite = async (inviteId: string) => {
     Alert.alert(
-      'Confirmar cancelamento',
+      'Cancelar convite',
       'Tem certeza que deseja cancelar este convite?',
       [
         {
-          text: 'Cancelar',
+          text: 'Não',
           style: 'cancel',
         },
         {
-          text: 'Confirmar',
+          text: 'Sim',
           style: 'destructive',
           onPress: async () => {
             try {
-              await AuthService.cancelInvite(inviteId);
+              await AuthService.getInstance().cancelInvite(inviteId);
               await loadData();
               Alert.alert('Sucesso', 'Convite cancelado com sucesso');
             } catch (error) {
@@ -134,7 +121,7 @@ export default function WorkersScreen() {
   };
 
   const renderWorkerItem = ({ item }: { item: Worker }) => (
-    <View style={styles.workerCard}>
+    <View style={styles.card}>
       <View style={styles.workerHeader}>
         <View>
           <Text style={styles.workerName}>{item.name}</Text>
@@ -155,44 +142,44 @@ export default function WorkersScreen() {
           </TouchableOpacity>
         </View>
       </View>
-      <View style={styles.workerStats}>
-        <View style={styles.statItem}>
-          <Text style={styles.statValue}>{item.tasksCount}</Text>
-          <Text style={styles.statLabel}>Total de tarefas</Text>
-        </View>
-        <View style={styles.statItem}>
-          <Text style={styles.statValue}>{item.completedTasks}</Text>
-          <Text style={styles.statLabel}>Tarefas concluídas</Text>
-        </View>
-        <View style={styles.statItem}>
-          <Text style={styles.statValue}>
-            {item.tasksCount > 0
-              ? Math.round((item.completedTasks / item.tasksCount) * 100)
-              : 0}
-            %
-          </Text>
-          <Text style={styles.statLabel}>Taxa de conclusão</Text>
-        </View>
+      <View style={styles.workerInfo}>
+        {item.phone && (
+          <Text style={styles.workerInfoText}>Telefone: {item.phone}</Text>
+        )}
+        {item.company && (
+          <Text style={styles.workerInfoText}>Empresa: {item.company}</Text>
+        )}
+        <Text style={[
+          styles.workerStatus,
+          { color: item.status === 'active' ? '#4CAF50' : '#F44336' }
+        ]}>
+          {item.status === 'active' ? 'Ativo' : 'Inativo'}
+        </Text>
       </View>
     </View>
   );
 
   const renderInviteItem = ({ item }: { item: Invite }) => (
-    <View style={styles.inviteCard}>
+    <View style={styles.card}>
       <View style={styles.inviteHeader}>
-        <View style={styles.inviteInfo}>
-          <Mail size={20} color="#666" style={styles.inviteIcon} />
+        <View>
           <Text style={styles.inviteEmail}>{item.email}</Text>
+          <Text style={styles.inviteDate}>
+            Enviado em: {new Date(item.createdAt).toLocaleDateString()}
+          </Text>
         </View>
         <TouchableOpacity
-          style={styles.cancelButton}
+          style={styles.actionButton}
           onPress={() => handleCancelInvite(item.id)}
         >
-          <Text style={styles.cancelButtonText}>Cancelar</Text>
+          <Trash2 size={20} color="#666" />
         </TouchableOpacity>
       </View>
-      <Text style={styles.inviteDate}>
-        Enviado em {new Date(item.createdAt).toLocaleDateString()}
+      <Text style={[
+        styles.inviteStatus,
+        { color: item.status === 'pending' ? '#FF9800' : '#666' }
+      ]}>
+        {item.status === 'pending' ? 'Pendente' : 'Aceito'}
       </Text>
     </View>
   );
@@ -209,39 +196,30 @@ export default function WorkersScreen() {
         <Text style={styles.title}>Gerenciar Trabalhadores</Text>
         <TouchableOpacity
           style={styles.addButton}
-          onPress={handleCreateInvite}
+          onPress={handleInvite}
         >
-          <Plus size={24} color="#000" />
+          <UserPlus size={24} color="#000" />
         </TouchableOpacity>
       </View>
 
       {loading ? (
         <View style={styles.loadingContainer}>
-          <Text>Carregando dados...</Text>
+          <Text>Carregando...</Text>
         </View>
       ) : (
         <FlatList
           data={[
             ...workers,
-            ...invites.map((invite) => ({
-              type: 'invite',
-              ...invite,
-            })),
+            ...invites.filter(invite => invite.status === 'pending'),
           ]}
-          renderItem={({ item }) =>
-            'type' in item
-              ? renderInviteItem({ item: item as Invite })
-              : renderWorkerItem({ item: item as Worker })
-          }
+          renderItem={({ item }) => {
+            if ('status' in item && item.status === 'pending') {
+              return renderInviteItem({ item: item as Invite });
+            }
+            return renderWorkerItem({ item: item as Worker });
+          }}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.list}
-          ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>
-                Nenhum trabalhador encontrado. Clique no botão + para enviar um convite.
-              </Text>
-            </View>
-          }
         />
       )}
     </SafeAreaView>
@@ -275,18 +253,18 @@ const styles = StyleSheet.create({
   list: {
     padding: 16,
   },
-  workerCard: {
+  card: {
     backgroundColor: '#fff',
     borderRadius: 8,
     padding: 16,
-    marginBottom: 16,
+    marginBottom: 12,
     boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.1)',
   },
   workerHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 16,
+    marginBottom: 8,
   },
   workerName: {
     fontSize: 18,
@@ -304,87 +282,43 @@ const styles = StyleSheet.create({
     padding: 8,
     marginLeft: 8,
   },
-  workerStats: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  workerInfo: {
     borderTopWidth: 1,
     borderTopColor: '#e0e0e0',
-    paddingTop: 16,
+    paddingTop: 12,
   },
-  statItem: {
-    alignItems: 'center',
-  },
-  statValue: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#2196F3',
-  },
-  statLabel: {
-    fontSize: 12,
+  workerInfoText: {
+    fontSize: 14,
     color: '#666',
-    marginTop: 4,
+    marginBottom: 4,
   },
-  inviteCard: {
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    padding: 16,
-    marginBottom: 16,
-    boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.1)',
+  workerStatus: {
+    fontSize: 14,
+    fontWeight: '500',
+    marginTop: 4,
   },
   inviteHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     marginBottom: 8,
-  },
-  inviteInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  inviteIcon: {
-    marginRight: 8,
   },
   inviteEmail: {
     fontSize: 16,
-    color: '#333',
-  },
-  cancelButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    backgroundColor: '#f44336',
-    borderRadius: 4,
-  },
-  cancelButtonText: {
-    color: '#fff',
-    fontSize: 14,
     fontWeight: '500',
+    marginBottom: 4,
   },
   inviteDate: {
     fontSize: 12,
     color: '#666',
   },
+  inviteStatus: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 16,
-  },
-  emptyText: {
-    fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
-  },
-  modalContent: {
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    padding: 20,
-    width: '100%',
-    maxWidth: 400,
-    boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.1)',
   },
 }); 

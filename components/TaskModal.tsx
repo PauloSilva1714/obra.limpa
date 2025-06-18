@@ -10,8 +10,9 @@ import {
   Alert,
   Image,
 } from 'react-native';
-import { X, Camera, User, Calendar, Flag, MapPin } from 'lucide-react-native';
+import { X, Camera, User, Calendar, Flag, MapPin, ChevronDown } from 'lucide-react-native';
 import type { Task } from '@/services/TaskService';
+import { AuthService } from '@/services/AuthService';
 
 interface TaskModalProps {
   visible: boolean;
@@ -35,6 +36,7 @@ export function TaskModal({ visible, task, userRole, onSave, onClose }: TaskModa
     area: '',
     photos: [] as string[],
   });
+  const [showAreaPicker, setShowAreaPicker] = useState(false);
 
   useEffect(() => {
     if (task) {
@@ -55,9 +57,9 @@ export function TaskModal({ visible, task, userRole, onSave, onClose }: TaskModa
         description: '',
         status: 'pending',
         priority: 'medium',
-        assignedTo: workers[0],
+        assignedTo: '',
         dueDate: new Date().toISOString().split('T')[0],
-        area: areas[0],
+        area: '',
         photos: [],
       });
     }
@@ -184,35 +186,39 @@ export function TaskModal({ visible, task, userRole, onSave, onClose }: TaskModa
               <User size={16} color="#6B7280" style={styles.labelIcon} />
               Responsável
             </Text>
-            <View style={styles.pickerContainer}>
-              <Text style={[styles.pickerText, (isReadOnly || userRole === 'worker') && styles.pickerTextDisabled]}>
-                {formData.assignedTo}
-              </Text>
-            </View>
+            <TextInput
+              style={[styles.input, userRole !== 'admin' && styles.inputDisabled]}
+              value={formData.assignedTo}
+              onChangeText={(text) => setFormData({ ...formData, assignedTo: text })}
+              placeholder="Digite o nome do responsável"
+              editable={userRole === 'admin'}
+            />
           </View>
 
           <View style={styles.section}>
             <Text style={styles.label}>
               <MapPin size={16} color="#6B7280" style={styles.labelIcon} />
-              Área
+              Local
             </Text>
-            <View style={styles.pickerContainer}>
-              <Text style={[styles.pickerText, (isReadOnly || userRole === 'worker') && styles.pickerTextDisabled]}>
-                {formData.area}
-              </Text>
-            </View>
+            <TextInput
+              style={[styles.input, userRole !== 'admin' && styles.inputDisabled]}
+              value={formData.area}
+              onChangeText={(text) => setFormData({ ...formData, area: text })}
+              placeholder="Digite o local da tarefa"
+              editable={userRole === 'admin'}
+            />
           </View>
 
           <View style={styles.section}>
             <Text style={styles.label}>
               <Calendar size={16} color="#6B7280" style={styles.labelIcon} />
-              Data de Vencimento
+              Entrada
             </Text>
             <TextInput
-              style={[styles.input, (isReadOnly || userRole === 'worker') && styles.inputDisabled]}
+              style={[styles.input, isReadOnly && styles.inputDisabled]}
               value={formData.dueDate}
               onChangeText={(text) => setFormData({ ...formData, dueDate: text })}
-              placeholder="AAAA-MM-DD"
+              placeholder="DD-MM-AAAA"
               editable={!isReadOnly && userRole === 'admin'}
             />
           </View>
@@ -246,6 +252,38 @@ export function TaskModal({ visible, task, userRole, onSave, onClose }: TaskModa
             </TouchableOpacity>
           )}
         </View>
+
+        {/* Area Picker Modal */}
+        <Modal
+          visible={showAreaPicker}
+          transparent
+          animationType="slide"
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.pickerModal}>
+              <View style={styles.pickerHeader}>
+                <Text style={styles.pickerTitle}>Selecione a Área</Text>
+                <TouchableOpacity onPress={() => setShowAreaPicker(false)}>
+                  <X size={24} color="#6B7280" />
+                </TouchableOpacity>
+              </View>
+              <ScrollView>
+                {areas.map((area) => (
+                  <TouchableOpacity
+                    key={area}
+                    style={styles.pickerOption}
+                    onPress={() => {
+                      setFormData({ ...formData, area });
+                      setShowAreaPicker(false);
+                    }}
+                  >
+                    <Text style={styles.pickerOptionText}>{area}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
       </View>
     </Modal>
   );
@@ -293,19 +331,17 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   input: {
-    backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: '#D1D5DB',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    borderRadius: 8,
+    padding: 12,
     fontSize: 16,
-    fontFamily: 'Inter-Regular',
-    color: '#111827',
+    color: '#374151',
+    backgroundColor: '#FFFFFF',
   },
   inputDisabled: {
     backgroundColor: '#F3F4F6',
-    color: '#6B7280',
+    color: '#9CA3AF',
   },
   textArea: {
     backgroundColor: '#FFFFFF',
@@ -370,20 +406,21 @@ const styles = StyleSheet.create({
     color: '#6B7280',
   },
   pickerContainer: {
-    backgroundColor: '#FFFFFF',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     borderWidth: 1,
     borderColor: '#D1D5DB',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    borderRadius: 8,
+    padding: 12,
+    backgroundColor: '#FFFFFF',
   },
   pickerText: {
     fontSize: 16,
-    fontFamily: 'Inter-Regular',
-    color: '#111827',
+    color: '#374151',
   },
   pickerTextDisabled: {
-    color: '#6B7280',
+    color: '#9CA3AF',
   },
   photosContainer: {
     flexDirection: 'row',
@@ -426,5 +463,37 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: 'Inter-SemiBold',
     color: '#FFFFFF',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  pickerModal: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    maxHeight: '80%',
+  },
+  pickerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  pickerTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#111827',
+  },
+  pickerOption: {
+    paddingVertical: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  pickerOptionText: {
+    fontSize: 16,
+    color: '#374151',
   },
 });
