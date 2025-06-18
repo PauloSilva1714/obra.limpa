@@ -5,21 +5,13 @@ import { AuthService } from '@/services/AuthService';
 
 export default function Index() {
   useEffect(() => {
-    checkAuthStatus();
-  }, []);
-
-  const checkAuthStatus = async () => {
-    const isAuthenticated = await AuthService.isAuthenticated();
-    const currentSite = await AuthService.getCurrentSite();
-    
-    if (isAuthenticated && currentSite) {
-      router.replace('/(tabs)');
-    } else if (isAuthenticated) {
-      router.replace('/(auth)/site-selection');
-    } else {
+    const initialize = async () => {
+      await AuthService.clearAuthData();
       router.replace('/(auth)/login');
-    }
-  };
+    };
+    
+    initialize();
+  }, []);
 
   return <View style={styles.container} />;
 }

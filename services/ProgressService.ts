@@ -1,4 +1,4 @@
-import { TaskService } from './TaskService';
+import TaskService from './TaskService';
 
 interface ProgressData {
   totalTasks: number;

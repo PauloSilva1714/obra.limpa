@@ -1,14 +1,27 @@
- {
+{
   "expo": {
     "name": "Obra Limpa",
     "slug": "obra-limpa",
     "version": "1.0.0",
     "orientation": "portrait",
-    "userInterfaceStyle": "automatic",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "newArchEnabled": true,
     "android": {
       "package": "com.obralimpa.app",
-      "googleServicesFile": "./google-services.json"
+      "googleServicesFile": "./google-services.json",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      }
     },
     "ios": {
       "supportsTablet": true,
@@ -17,7 +30,9 @@
     },
     "web": {
       "bundler": "metro",
-      "output": "single"
+      "output": "static",
+      "favicon": "./assets/favicon.png",
+      "entryPoint": "./web/index.html"
     },
     "plugins": [
       "expo-router",
@@ -26,7 +41,8 @@
       "@react-native-firebase/app"
     ],
     "experiments": {
-      "typedRoutes": true
+      "typedRoutes": true,
+      "tsconfigPaths": true
     }
   }
 }

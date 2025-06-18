@@ -1,47 +1,60 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Função auxiliar para verificar se o usuário está autenticado
+    // Funções auxiliares
     function isAuthenticated() {
       return request.auth != null;
     }
-    
-    // Função auxiliar para verificar se o usuário é admin
+
     function isAdmin() {
-      return isAuthenticated() && 
+      return isAuthenticated() &&
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
-    
-    // Função auxiliar para verificar se o usuário é o dono do documento
+
+    function isWorker() {
+      return isAuthenticated() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'worker';
+    }
+
     function isOwner(userId) {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
-    // Regras para a coleção de usuários
+    function isSiteMember(siteId) {
+      return isAuthenticated() && (
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.siteId == siteId ||
+        isAdmin()
+      );
+    }
+
+    // Regras para usuários
     match /users/{userId} {
       allow read: if isAuthenticated();
       allow create: if isAuthenticated();
-      allow update, delete: if isAdmin() || isOwner(userId);
+      allow update, delete: if isOwner(userId) || isAdmin();
     }
 
-    // Regras para a coleção de convites
+    // Regras para convites
     match /invites/{inviteId} {
-      allow read: if isAuthenticated() && (
-        isAdmin() || 
-        resource.data.email == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.email
-      );
+      allow read: if isAuthenticated();
       allow create: if isAdmin();
-      allow update: if isAdmin() || (
-        isAuthenticated() && 
-        resource.data.email == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.email
-      );
-      allow delete: if isAdmin();
+      allow update, delete: if isAdmin();
     }
 
-    // Regras para a coleção de sites
+    // Regras para tarefas
+    match /tasks/{taskId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update, delete: if isAdmin() || isSiteMember(resource.data.siteId);
+      allow list: if isAuthenticated();
+    }
+
+    // Regras para obras
     match /sites/{siteId} {
       allow read: if isAuthenticated();
-      allow write: if isAdmin();
+      allow create: if isAdmin();
+      allow update, delete: if isAdmin();
+      allow list: if isAuthenticated();
     }
   }
 } 

@@ -1,19 +1,23 @@
 import { useEffect, useState } from 'react';
-import { Stack, useRouter, useSegments } from 'expo-router';
+import { Stack, Slot } from 'expo-router';
+import Head from 'expo-router/head';
 import { StatusBar } from 'expo-status-bar';
 import { useFrameworkReady } from '@/hooks/useFrameworkReady';
-import { useFonts, Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold } from '@expo-google-fonts/inter';
+import {
+  useFonts,
+  Inter_400Regular,
+  Inter_500Medium,
+  Inter_600SemiBold,
+  Inter_700Bold,
+} from '@expo-google-fonts/inter';
 import * as SplashScreen from 'expo-splash-screen';
-import { AuthService } from '@/services/AuthService';
 
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   useFrameworkReady();
-  const router = useRouter();
-  const segments = useSegments();
   const [isLoading, setIsLoading] = useState(true);
-  
+
   const [fontsLoaded, fontError] = useFonts({
     'Inter-Regular': Inter_400Regular,
     'Inter-Medium': Inter_500Medium,
@@ -22,45 +26,19 @@ export default function RootLayout() {
   });
 
   useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        console.log('Verificando autenticação...');
-        const isAuthenticated = await AuthService.isAuthenticated();
-        console.log('Status de autenticação:', isAuthenticated);
-
-        if (isAuthenticated) {
-          const currentSite = await AuthService.getCurrentSite();
-          console.log('Canteiro atual:', currentSite);
-          
-          const currentPath = segments.join('/');
-          console.log('Caminho atual:', currentPath);
-
-          if (!currentSite && !currentPath.includes('site-selection')) {
-            console.log('Redirecionando para seleção de canteiro...');
-            router.replace('/(auth)/site-selection');
-          } else if (currentSite && currentPath.includes('(auth)')) {
-            console.log('Redirecionando para tabs...');
-            router.replace('/(tabs)');
-          }
-        } else if (!segments.includes('login')) {
-          console.log('Redirecionando para login...');
-          router.replace('/(auth)/login');
-        }
-      } catch (error) {
-        console.error('Erro ao verificar autenticação:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    checkAuth();
-  }, [segments]);
-
-  useEffect(() => {
     if (fontsLoaded || fontError) {
       SplashScreen.hideAsync();
+      setIsLoading(false);
     }
   }, [fontsLoaded, fontError]);
+
+  useEffect(() => {
+    document.title = 'Obra Limpa';
+    const link = document.createElement('link');
+    link.rel = 'icon';
+    link.href = '/favicon.ico';
+    document.head.appendChild(link);
+  }, []);
 
   if (isLoading) {
     return null;
@@ -68,6 +46,22 @@ export default function RootLayout() {
 
   return (
     <>
+      <Head>
+        <title>Obra Limpa</title>
+        <meta
+          name="description"
+          content="Sistema de gerenciamento de obras e tarefas"
+        />
+        <meta
+          name="viewport"
+          content="width=device-width, initial-scale=1, maximum-scale=1"
+        />
+        <meta name="theme-color" content="#ffffff" />
+        <link rel="icon" href="/favicon.ico" />
+        <link rel="apple-touch-icon" href="/icon.png" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+      </Head>
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="index" />
         <Stack.Screen name="(auth)/login" />

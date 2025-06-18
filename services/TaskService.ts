@@ -1,150 +1,330 @@
-import { AuthService } from './AuthService';
+import { db } from '@/config/firebase';
+import {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  query,
+  where,
+  addDoc,
+  updateDoc,
+  deleteDoc,
+  serverTimestamp,
+  orderBy,
+} from 'firebase/firestore';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-interface Task {
+export interface Task {
   id: string;
   title: string;
   description: string;
-  status: 'pending' | 'in_progress' | 'completed';
+  status: 'pending' | 'in_progress' | 'completed' | 'delayed';
   priority: 'low' | 'medium' | 'high';
-  assignedTo: string;
-  dueDate: string;
+  assignedTo?: string;
+  siteId: string;
   createdAt: string;
+  updatedAt: string;
+  completedAt?: string;
+  dueDate?: string;
   photos: string[];
   area: string;
-  siteId: string;
 }
 
-class TaskManagementService {
-  private demoTasks: Task[] = [
-    {
-      id: '1',
-      title: 'Limpeza do Canteiro Principal',
-      description: 'Remover entulhos e organizar materiais de construção na área central do canteiro.',
-      status: 'pending',
-      priority: 'high',
-      assignedTo: 'João Silva',
-      dueDate: '2024-01-20',
-      createdAt: '2024-01-15',
-      photos: [],
-      area: 'Canteiro',
-      siteId: '1'
-    },
-    {
-      id: '2',
-      title: 'Organização do Almoxarifado',
-      description: 'Catalogar e organizar ferramentas e materiais no almoxarifado.',
-      status: 'in_progress',
-      priority: 'medium',
-      assignedTo: 'Maria Santos',
-      dueDate: '2024-01-22',
-      createdAt: '2024-01-16',
-      photos: ['https://images.pexels.com/photos/159306/construction-site-build-construction-work-159306.jpeg'],
-      area: 'Almoxarifado',
-      siteId: '1'
-    },
-    {
-      id: '3',
-      title: 'Limpeza dos Banheiros Provisórios',
-      description: 'Higienização completa dos banheiros químicos e reposição de suprimentos.',
-      status: 'completed',
-      priority: 'high',
-      assignedTo: 'Carlos Oliveira',
-      dueDate: '2024-01-18',
-      createdAt: '2024-01-14',
-      photos: ['https://images.pexels.com/photos/209274/pexels-photo-209274.jpeg'],
-      area: 'Instalações',
-      siteId: '1'
-    },
-    {
-      id: '4',
-      title: 'Varredura da Área Externa',
-      description: 'Limpeza completa da área externa do canteiro, incluindo calçadas.',
-      status: 'pending',
-      priority: 'low',
-      assignedTo: 'Ana Costa',
-      dueDate: '2024-01-25',
-      createdAt: '2024-01-17',
-      photos: [],
-      area: 'Área Externa',
-      siteId: '1'
-    },
-    {
-      id: '5',
-      title: 'Organização da Sala de Reuniões',
-      description: 'Organizar documentos e limpar a sala de reuniões do escritório.',
-      status: 'in_progress',
-      priority: 'medium',
-      assignedTo: 'Pedro Silva',
-      dueDate: '2024-01-21',
-      createdAt: '2024-01-16',
-      photos: [],
-      area: 'Escritório',
-      siteId: '1'
+class TaskService {
+  private static instance: TaskService;
+  private static TASKS_KEY = 'tasks';
+
+  private constructor() {}
+
+  static getInstance(): TaskService {
+    if (!TaskService.instance) {
+      TaskService.instance = new TaskService();
     }
-  ];
+    return TaskService.instance;
+  }
 
   async getTasks(): Promise<Task[]> {
     try {
-      console.log('Obtendo canteiro atual...');
-      const currentSite = await AuthService.getCurrentSite();
-      console.log('Canteiro atual:', currentSite);
-
-      if (!currentSite) {
-        console.error('Nenhum canteiro selecionado');
-        return [];
+      const siteId = await AsyncStorage.getItem('selectedSite');
+      if (!siteId) {
+        throw new Error('Nenhuma obra selecionada');
       }
 
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      const tasks = this.demoTasks.filter(task => task.siteId === currentSite.id);
-      console.log('Tarefas filtradas:', tasks);
-      return tasks;
+      const tasksQuery = query(
+        collection(db, 'tasks'),
+        where('siteId', '==', siteId),
+        orderBy('createdAt', 'desc')
+      );
+      const snapshot = await getDocs(tasksQuery);
+      return snapshot.docs.map(
+        (doc) =>
+          ({
+            id: doc.id,
+            ...doc.data(),
+          } as Task)
+      );
     } catch (error) {
-      console.error('Erro ao carregar tarefas:', error);
-      return [];
+      console.error('Erro ao obter tarefas:', error);
+      throw error;
     }
   }
 
-  async createTask(taskData: Omit<Task, 'id' | 'createdAt'>): Promise<Task> {
-    const currentSite = await AuthService.getCurrentSite();
-    if (!currentSite) {
-      throw new Error('Nenhum canteiro selecionado');
-    }
+  async createTask(
+    task: Omit<Task, 'id' | 'createdAt' | 'updatedAt'>
+  ): Promise<Task> {
+    try {
+      const siteId = await AsyncStorage.getItem('selectedSite');
+      if (!siteId) {
+        throw new Error('Nenhuma obra selecionada');
+      }
 
-    const newTask: Task = {
-      ...taskData,
-      id: Date.now().toString(),
-      createdAt: new Date().toISOString(),
-      siteId: currentSite.id
-    };
-    
-    this.demoTasks.unshift(newTask);
-    return newTask;
+      const newTask = {
+        ...task,
+        siteId,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      };
+
+      const docRef = await addDoc(collection(db, 'tasks'), newTask);
+      return {
+        id: docRef.id,
+        ...newTask,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+    } catch (error) {
+      console.error('Erro ao criar tarefa:', error);
+      throw error;
+    }
   }
 
-  async updateTask(taskId: string, updates: Partial<Task>): Promise<Task> {
-    const taskIndex = this.demoTasks.findIndex(task => task.id === taskId);
-    
-    if (taskIndex === -1) {
-      throw new Error('Task not found');
+  async updateTask(taskId: string, updates: Partial<Task>): Promise<void> {
+    try {
+      await updateDoc(doc(db, 'tasks', taskId), {
+        ...updates,
+        updatedAt: serverTimestamp(),
+      });
+    } catch (error) {
+      console.error('Erro ao atualizar tarefa:', error);
+      throw error;
     }
-    
-    this.demoTasks[taskIndex] = {
-      ...this.demoTasks[taskIndex],
-      ...updates
-    };
-    
-    return this.demoTasks[taskIndex];
   }
 
   async deleteTask(taskId: string): Promise<void> {
-    this.demoTasks = this.demoTasks.filter(task => task.id !== taskId);
+    try {
+      await deleteDoc(doc(db, 'tasks', taskId));
+    } catch (error) {
+      console.error('Erro ao deletar tarefa:', error);
+      throw error;
+    }
+  }
+
+  async completeTask(taskId: string): Promise<void> {
+    try {
+      await updateDoc(doc(db, 'tasks', taskId), {
+        status: 'completed',
+        completedAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+    } catch (error) {
+      console.error('Erro ao completar tarefa:', error);
+      throw error;
+    }
   }
 
   async getTaskById(taskId: string): Promise<Task | null> {
-    return this.demoTasks.find(task => task.id === taskId) || null;
+    try {
+      const taskDoc = await getDoc(doc(db, 'tasks', taskId));
+      if (!taskDoc.exists()) {
+        return null;
+      }
+      return {
+        id: taskDoc.id,
+        ...taskDoc.data(),
+      } as Task;
+    } catch (error) {
+      console.error('Erro ao obter tarefa:', error);
+      throw error;
+    }
+  }
+
+  async getTasksByStatus(status: Task['status']): Promise<Task[]> {
+    try {
+      const siteId = await AsyncStorage.getItem('selectedSite');
+      if (!siteId) {
+        throw new Error('Nenhuma obra selecionada');
+      }
+
+      const tasksQuery = query(
+        collection(db, 'tasks'),
+        where('siteId', '==', siteId),
+        where('status', '==', status),
+        orderBy('createdAt', 'desc')
+      );
+      const snapshot = await getDocs(tasksQuery);
+      return snapshot.docs.map(
+        (doc) =>
+          ({
+            id: doc.id,
+            ...doc.data(),
+          } as Task)
+      );
+    } catch (error) {
+      console.error('Erro ao obter tarefas por status:', error);
+      throw error;
+    }
+  }
+
+  async getTasksByWorker(workerId: string): Promise<Task[]> {
+    try {
+      const siteId = await AsyncStorage.getItem('selectedSite');
+      if (!siteId) {
+        throw new Error('Nenhuma obra selecionada');
+      }
+
+      const tasksQuery = query(
+        collection(db, 'tasks'),
+        where('siteId', '==', siteId),
+        where('assignedTo', '==', workerId),
+        orderBy('createdAt', 'desc')
+      );
+      const snapshot = await getDocs(tasksQuery);
+      return snapshot.docs.map(
+        (doc) =>
+          ({
+            id: doc.id,
+            ...doc.data(),
+          } as Task)
+      );
+    } catch (error) {
+      console.error('Erro ao obter tarefas por trabalhador:', error);
+      throw error;
+    }
+  }
+
+  async getTasksByPriority(priority: Task['priority']): Promise<Task[]> {
+    try {
+      const siteId = await AsyncStorage.getItem('selectedSite');
+      if (!siteId) {
+        throw new Error('Nenhuma obra selecionada');
+      }
+
+      const tasksQuery = query(
+        collection(db, 'tasks'),
+        where('siteId', '==', siteId),
+        where('priority', '==', priority),
+        orderBy('createdAt', 'desc')
+      );
+      const snapshot = await getDocs(tasksQuery);
+      return snapshot.docs.map(
+        (doc) =>
+          ({
+            id: doc.id,
+            ...doc.data(),
+          } as Task)
+      );
+    } catch (error) {
+      console.error('Erro ao obter tarefas por prioridade:', error);
+      throw error;
+    }
+  }
+
+  async getTasksBySite(siteId: string): Promise<Task[]> {
+    try {
+      const tasksQuery = query(
+        collection(db, 'tasks'),
+        where('siteId', '==', siteId),
+        orderBy('createdAt', 'desc')
+      );
+      const snapshot = await getDocs(tasksQuery);
+      return snapshot.docs.map(
+        (doc) =>
+          ({
+            id: doc.id,
+            ...doc.data(),
+          } as Task)
+      );
+    } catch (error) {
+      console.error('Erro ao obter tarefas da obra:', error);
+      throw error;
+    }
+  }
+
+  async getTasksBySiteAndStatus(
+    siteId: string,
+    status: Task['status']
+  ): Promise<Task[]> {
+    try {
+      const tasksQuery = query(
+        collection(db, 'tasks'),
+        where('siteId', '==', siteId),
+        where('status', '==', status),
+        orderBy('createdAt', 'desc')
+      );
+      const snapshot = await getDocs(tasksQuery);
+      return snapshot.docs.map(
+        (doc) =>
+          ({
+            id: doc.id,
+            ...doc.data(),
+          } as Task)
+      );
+    } catch (error) {
+      console.error('Erro ao obter tarefas da obra por status:', error);
+      throw error;
+    }
+  }
+
+  async getTasksBySiteAndWorker(
+    siteId: string,
+    workerId: string
+  ): Promise<Task[]> {
+    try {
+      const tasksQuery = query(
+        collection(db, 'tasks'),
+        where('siteId', '==', siteId),
+        where('assignedTo', '==', workerId),
+        orderBy('createdAt', 'desc')
+      );
+      const snapshot = await getDocs(tasksQuery);
+      return snapshot.docs.map(
+        (doc) =>
+          ({
+            id: doc.id,
+            ...doc.data(),
+          } as Task)
+      );
+    } catch (error) {
+      console.error('Erro ao obter tarefas da obra por trabalhador:', error);
+      throw error;
+    }
+  }
+
+  async getTasksBySiteAndPriority(
+    siteId: string,
+    priority: Task['priority']
+  ): Promise<Task[]> {
+    try {
+      const tasksQuery = query(
+        collection(db, 'tasks'),
+        where('siteId', '==', siteId),
+        where('priority', '==', priority),
+        orderBy('createdAt', 'desc')
+      );
+      const snapshot = await getDocs(tasksQuery);
+      return snapshot.docs.map(
+        (doc) =>
+          ({
+            id: doc.id,
+            ...doc.data(),
+          } as Task)
+      );
+    } catch (error) {
+      console.error('Erro ao obter tarefas da obra por prioridade:', error);
+      throw error;
+    }
   }
 }
 
-export const TaskService = new TaskManagementService();
+const taskService = TaskService.getInstance();
+export default taskService;

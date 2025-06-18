@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -18,6 +18,10 @@ export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    document.title = 'Obra Limpa';
+  }, []);
 
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
@@ -42,35 +46,6 @@ export default function LoginScreen() {
     } catch (error) {
       console.error('Erro ao fazer login:', error);
       Alert.alert('Erro', 'Erro ao fazer login. Tente novamente.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleDemoLogin = async (role: 'admin' | 'worker') => {
-    setLoading(true);
-    const demoCredentials =
-      role === 'admin'
-        ? { email: 'admin@construcao.com', password: 'admin123' }
-        : { email: 'campo@construcao.com', password: 'campo123' };
-
-    try {
-      console.log('Tentando login demo...');
-      const success = await AuthService.login(
-        demoCredentials.email,
-        demoCredentials.password
-      );
-      console.log('Resultado do login demo:', success);
-
-      if (success) {
-        // Limpar canteiro atual ao fazer login
-        await AuthService.setCurrentSite(null);
-        console.log('Redirecionando para seleção de canteiro');
-        router.replace('/(auth)/site-selection');
-      }
-    } catch (error) {
-      console.error('Erro ao fazer login demo:', error);
-      Alert.alert('Erro', 'Erro ao fazer login demo.');
     } finally {
       setLoading(false);
     }
@@ -154,26 +129,8 @@ export default function LoginScreen() {
               </Text>
             </TouchableOpacity>
           </View>
-
-          <View style={styles.demoSection}>
-            <Text style={styles.demoTitle}>Acesso Demo:</Text>
-            <TouchableOpacity
-              style={styles.demoButton}
-              onPress={() => handleDemoLogin('admin')}
-              disabled={loading}
-            >
-              <Text style={styles.demoButtonText}>Administrador</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.demoButton}
-              onPress={() => handleDemoLogin('worker')}
-              disabled={loading}
-            >
-              <Text style={styles.demoButtonText}>Trabalhador de Campo</Text>
-            </TouchableOpacity>
-          </View>
         </View>
-        <View style={{ pointerEvents: 'none' }} />
+        <View style={styles.disabledView} />
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -283,30 +240,7 @@ const styles = StyleSheet.create({
     color: '#374151',
     textAlign: 'center',
   },
-  demoSection: {
-    marginTop: 24,
-    paddingTop: 24,
-    borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
-  },
-  demoTitle: {
-    fontSize: 14,
-    fontFamily: 'Inter-Medium',
-    color: '#666666',
-    textAlign: 'center',
-    marginBottom: 16,
-  },
-  demoButton: {
-    backgroundColor: '#F3F4F6',
-    borderRadius: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    marginBottom: 8,
-  },
-  demoButtonText: {
-    fontSize: 14,
-    fontFamily: 'Inter-Medium',
-    color: '#374151',
-    textAlign: 'center',
+  disabledView: {
+    pointerEvents: 'none',
   },
 });

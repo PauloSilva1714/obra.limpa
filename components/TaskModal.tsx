@@ -11,24 +11,12 @@ import {
   Image,
 } from 'react-native';
 import { X, Camera, User, Calendar, Flag, MapPin } from 'lucide-react-native';
-
-interface Task {
-  id: string;
-  title: string;
-  description: string;
-  status: 'pending' | 'in_progress' | 'completed';
-  priority: 'low' | 'medium' | 'high';
-  assignedTo: string;
-  dueDate: string;
-  createdAt: string;
-  photos: string[];
-  area: string;
-}
+import type { Task } from '@/services/TaskService';
 
 interface TaskModalProps {
   visible: boolean;
   task: Task | null;
-  userRole: 'admin' | 'worker';
+  userRole: 'admin' | 'worker' | null;
   onSave: (task: Partial<Task>) => void;
   onClose: () => void;
 }
@@ -91,6 +79,7 @@ export function TaskModal({ visible, task, userRole, onSave, onClose }: TaskModa
 
   const isReadOnly = userRole === 'worker' && task?.status === 'completed';
   const isEditing = !!task;
+  const canEdit = userRole === 'admin' || (userRole === 'worker' && !isReadOnly);
 
   const StatusButton = ({ status, label }: { status: Task['status']; label: string }) => (
     <TouchableOpacity
@@ -118,10 +107,10 @@ export function TaskModal({ visible, task, userRole, onSave, onClose }: TaskModa
       style={[
         styles.priorityButton,
         formData.priority === priority && { backgroundColor: color + '20', borderColor: color },
-        (isReadOnly || userRole === 'worker') && styles.statusButtonDisabled,
+        (!canEdit || isReadOnly) && styles.statusButtonDisabled,
       ]}
-      onPress={() => userRole === 'admin' && !isReadOnly && setFormData({ ...formData, priority })}
-      disabled={isReadOnly || userRole === 'worker'}
+      onPress={() => canEdit && !isReadOnly && setFormData({ ...formData, priority })}
+      disabled={!canEdit || isReadOnly}
     >
       <Flag size={16} color={formData.priority === priority ? color : '#6B7280'} />
       <Text

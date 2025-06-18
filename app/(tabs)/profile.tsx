@@ -146,6 +146,31 @@ export default function ProfileScreen() {
       </View>
 
       <View style={styles.menuContainer}>
+        {profile.role === 'admin' && (
+          <>
+            <MenuSection title="Administração">
+              <MenuItem
+                icon={<Building2 size={20} color="#6B7280" />}
+                title="Gerenciar Obras"
+                subtitle="Criar, editar e visualizar obras"
+                onPress={() => router.push('/admin/sites')}
+              />
+              <MenuItem
+                icon={<User size={20} color="#6B7280" />}
+                title="Gerenciar Trabalhadores"
+                subtitle="Criar convites e gerenciar permissões"
+                onPress={() => router.push('/admin/workers')}
+              />
+              <MenuItem
+                icon={<Shield size={20} color="#6B7280" />}
+                title="Estatísticas"
+                subtitle="Visualizar métricas e relatórios"
+                onPress={() => router.push('/admin/stats')}
+              />
+            </MenuSection>
+          </>
+        )}
+
         <MenuSection title="Obra">
           <MenuItem
             icon={<Building2 size={20} color="#6B7280" />}
@@ -235,14 +260,7 @@ const styles = StyleSheet.create({
     marginTop: 16,
     padding: 20,
     borderRadius: 16,
-    shadowColor: '#000000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
   },
   avatarContainer: {
     width: 64,
@@ -338,5 +356,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: 'Inter-Regular',
     color: '#6B7280',
+  },
+  card: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
   },
 });

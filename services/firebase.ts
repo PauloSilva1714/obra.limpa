@@ -6,9 +6,9 @@ const firebaseConfig = {
   apiKey: "AIzaSyDHJm219NVmB5KdQcLYRgOrp_coC_KbycQ",
   authDomain: "bralimpa2.firebaseapp.com",
   projectId: "bralimpa2",
-  storageBucket: "bralimpa2.appspot.com",
+  storageBucket: "bralimpa2.firebasestorage.app",
   messagingSenderId: "127747660506",
-  appId: "1:127747660506:web:b1d89516a0bc22698de3e3"
+  appId: "1:127747660506:web:b1d89516a0bc22698de3e3",
 };
 
 // Inicializa o Firebase apenas se não houver uma instância já existente

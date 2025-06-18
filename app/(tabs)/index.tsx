@@ -17,47 +17,38 @@ import {
   User,
   Calendar,
 } from 'lucide-react-native';
-import { TaskService } from '@/services/TaskService';
+import TaskService, { Task } from '@/services/TaskService';
 import { AuthService } from '@/services/AuthService';
 import { TaskModal } from '@/components/TaskModal';
-
-interface Task {
-  id: string;
-  title: string;
-  description: string;
-  status: 'pending' | 'in_progress' | 'completed';
-  priority: 'low' | 'medium' | 'high';
-  assignedTo: string;
-  dueDate: string;
-  createdAt: string;
-  photos: string[];
-  area: string;
-  siteId: string;
-}
 
 export default function TasksScreen() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [userRole, setUserRole] = useState<'admin' | 'worker'>('worker');
+  const [userRole, setUserRole] = useState<'admin' | 'worker' | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [isInitialized, setIsInitialized] = useState(false);
 
   useEffect(() => {
-    initializeScreen();
-  }, []);
+    if (isInitialized) return;
 
-  const initializeScreen = async () => {
-    try {
-      console.log('Inicializando tela de tarefas...');
-      const role = AuthService.getUserRole();
-      console.log('Papel do usuário na tela de tarefas:', role);
-      setUserRole(role);
-      await loadTasks();
-    } catch (error) {
-      console.error('Erro ao inicializar tela de tarefas:', error);
-    }
-  };
+    const initializeScreen = async () => {
+      try {
+        console.log('Inicializando tela de tarefas...');
+        const role = await AuthService.getUserRole();
+        console.log('Papel do usuário na tela de tarefas:', role);
+
+        setUserRole(role);
+        await loadTasks();
+        setIsInitialized(true);
+      } catch (error) {
+        console.error('Erro ao inicializar tela de tarefas:', error);
+      }
+    };
+
+    initializeScreen();
+  }, [isInitialized]);
 
   const loadTasks = async () => {
     try {
@@ -177,7 +168,9 @@ export default function TasksScreen() {
         <View style={styles.metaItem}>
           <Calendar size={14} color="#6B7280" />
           <Text style={styles.metaText}>
-            {new Date(item.dueDate).toLocaleDateString('pt-BR')}
+            {item.dueDate
+              ? new Date(item.dueDate).toLocaleDateString('pt-BR')
+              : 'Sem data'}
           </Text>
         </View>
       </View>
@@ -246,35 +239,33 @@ export default function TasksScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
+    backgroundColor: '#F3F4F6',
+  },
+  content: {
+    flex: 1,
+    padding: 16,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 24,
-    paddingVertical: 16,
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    marginBottom: 24,
   },
   title: {
     fontSize: 24,
-    fontFamily: 'Inter-Bold',
+    fontFamily: 'Inter-SemiBold',
     color: '#111827',
   },
   addButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#F97316',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: '#2563EB',
+    padding: 12,
+    borderRadius: 12,
+    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
   },
   statsContainer: {
     flexDirection: 'row',
-    paddingHorizontal: 16,
-    paddingVertical: 16,
+    justifyContent: 'space-between',
+    marginBottom: 24,
   },
   statCard: {
     flex: 1,
@@ -283,14 +274,7 @@ const styles = StyleSheet.create({
     padding: 16,
     marginHorizontal: 4,
     alignItems: 'center',
-    shadowColor: '#000000',
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
+    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
   },
   statNumber: {
     fontSize: 24,
@@ -308,17 +292,10 @@ const styles = StyleSheet.create({
   },
   taskCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 16,
-    shadowColor: '#000000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
   },
   taskHeader: {
     flexDirection: 'row',
@@ -395,4 +372,3 @@ const styles = StyleSheet.create({
     color: '#6B7280',
   },
 });
-

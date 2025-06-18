@@ -14,45 +14,84 @@ import {
   query,
   where,
   updateDoc,
+  addDoc,
+  deleteDoc,
+  serverTimestamp,
 } from 'firebase/firestore';
-import { auth, db } from './firebase';
+import { auth, db } from '../config/firebase';
 
 export interface User {
   id: string;
   name: string;
   email: string;
   role: 'admin' | 'worker';
+  status: 'active' | 'inactive';
   phone?: string;
   company?: string;
   sites?: string[];
+  siteId?: string;
 }
 
 export interface Site {
   id: string;
   name: string;
   address: string;
+  status: 'active' | 'inactive';
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface Invite {
   id: string;
   email: string;
+  status: 'pending' | 'accepted' | 'rejected';
   siteId: string;
   createdAt: string;
-  status: 'pending' | 'accepted' | 'expired';
-  invitedBy: string;
 }
 
 export class AuthService {
   private static USER_KEY = 'user';
   static SITE_KEY = 'sua-chave-aqui';
+  private static instance: AuthService;
+  private currentUser: User | null = null;
+
+  private constructor() {}
+
+  static getInstance(): AuthService {
+    if (!AuthService.instance) {
+      AuthService.instance = new AuthService();
+    }
+    return AuthService.instance;
+  }
 
   static async isAuthenticated(): Promise<boolean> {
     try {
-      const userData = await AsyncStorage.getItem(this.USER_KEY);
+      // Verificar se há um usuário autenticado no Firebase
+      const currentUser = auth.currentUser;
+      if (!currentUser) {
+        // Se não houver usuário no Firebase, limpar dados locais
+        await this.clearAuthData();
+        return false;
+      }
+
+      // Verificar se há dados do usuário no AsyncStorage
+      const userData = await this.getCurrentUser();
       return !!userData;
     } catch (error) {
       console.error('Erro ao verificar autenticação:', error);
       return false;
+    }
+  }
+
+  static async clearAuthData(): Promise<void> {
+    try {
+      await AsyncStorage.removeItem(this.USER_KEY);
+      await AsyncStorage.removeItem(this.SITE_KEY);
+      await signOut(auth);
+      this.getInstance().currentUser = null;
+    } catch (error) {
+      console.error('Erro ao limpar dados de autenticação:', error);
+      throw error;
     }
   }
 
@@ -102,19 +141,19 @@ export class AuthService {
   static async login(email: string, password: string): Promise<boolean> {
     try {
       console.log('Tentando login com:', email);
-      // Simulação de autenticação
-      if (email === 'admin@construcao.com' && password === 'admin123') {
-        const user = {
-          id: '1',
-          name: 'João Silva',
-          email: 'admin@construcao.com',
-          role: 'admin',
-        };
-        await AsyncStorage.setItem(this.USER_KEY, JSON.stringify(user));
-        console.log('Login bem-sucedido:', user);
-        return true;
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      
+      // Buscar dados do usuário no Firestore
+      const userDoc = await getDoc(doc(db, 'users', userCredential.user.uid));
+      
+      if (!userDoc.exists()) {
+        throw new Error('Usuário não encontrado');
       }
-      return false;
+
+      const userData = userDoc.data() as User;
+      await AsyncStorage.setItem(this.USER_KEY, JSON.stringify(userData));
+      console.log('Login bem-sucedido:', userData);
+      return true;
     } catch (error) {
       console.error('Erro no login:', error);
       return false;
@@ -198,6 +237,8 @@ export class AuthService {
         phone: userData.phone,
         company: userData.company,
         sites: userData.role === 'admin' ? [siteId] : [invite?.siteId || ''],
+        status: 'active',
+        siteId: userData.role === 'admin' ? siteId : undefined,
       };
 
       await setDoc(doc(db, 'users', user.id), user);
@@ -206,6 +247,9 @@ export class AuthService {
       await signOut(auth);
       await AsyncStorage.removeItem(AuthService.USER_KEY);
       await AsyncStorage.removeItem(AuthService.SITE_KEY);
+
+      AuthService.getInstance().currentUser = user;
+      await this.saveUserToStorage(user);
 
       return true;
     } catch (error: any) {
@@ -242,7 +286,6 @@ export class AuthService {
         siteId,
         createdAt: new Date().toISOString(),
         status: 'pending',
-        invitedBy: currentUser.id,
       };
 
       await setDoc(doc(db, 'invites', invite.id), invite);
@@ -296,6 +339,7 @@ export class AuthService {
       name: 'João Silva',
       email: 'admin@construcao.com',
       role: 'admin',
+      status: 'active',
       sites: ['site1'],
     },
     {
@@ -303,6 +347,7 @@ export class AuthService {
       name: 'Maria Souza',
       email: 'worker@construcao.com',
       role: 'worker',
+      status: 'active',
       sites: ['site1'],
     },
   ];
@@ -312,6 +357,9 @@ export class AuthService {
       id: 'site1',
       name: 'Obra Central',
       address: 'Rua Principal, 123',
+      status: 'active',
+      createdAt: '2024-01-01T00:00:00.000Z',
+      updatedAt: '2024-01-01T00:00:00.000Z',
     },
   ];
 
@@ -343,9 +391,169 @@ export class AuthService {
     };
   }
 
-  static getUserRole(): 'admin' | 'worker' {
-    // Replace this with your actual logic to get the user role
-    // For example, from AsyncStorage, a global variable, or a user object
-    return 'worker'; // or 'admin'
+  static async getUserRole(): Promise<'admin' | 'worker'> {
+    try {
+      const userData = await AsyncStorage.getItem(this.USER_KEY);
+      if (!userData) return 'worker';
+      
+      const user = JSON.parse(userData);
+      return user.role;
+    } catch (error) {
+      console.error('Erro ao obter papel do usuário:', error);
+      return 'worker';
+    }
+  }
+
+  private async saveUserToStorage(user: User): Promise<void> {
+    try {
+      await AsyncStorage.setItem(AuthService.USER_KEY, JSON.stringify(user));
+    } catch (error) {
+      console.error('Erro ao salvar usuário no storage:', error);
+      throw error;
+    }
+  }
+
+  async getWorkers(): Promise<User[]> {
+    try {
+      const workersQuery = query(
+        collection(db, 'users'),
+        where('role', '==', 'worker')
+      );
+      const snapshot = await getDocs(workersQuery);
+      return snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      } as User));
+    } catch (error) {
+      console.error('Erro ao buscar trabalhadores:', error);
+      throw error;
+    }
+  }
+
+  async getWorkerById(workerId: string): Promise<User | null> {
+    try {
+      const workerDoc = await getDoc(doc(db, 'users', workerId));
+      if (!workerDoc.exists()) {
+        return null;
+      }
+      return {
+        id: workerDoc.id,
+        ...workerDoc.data(),
+      } as User;
+    } catch (error) {
+      console.error('Erro ao obter trabalhador:', error);
+      throw error;
+    }
+  }
+
+  async updateWorker(workerId: string, updates: Partial<User>): Promise<void> {
+    try {
+      await updateDoc(doc(db, 'users', workerId), {
+        ...updates,
+        updatedAt: serverTimestamp(),
+      });
+    } catch (error) {
+      console.error('Erro ao atualizar trabalhador:', error);
+      throw error;
+    }
+  }
+
+  async removeWorker(workerId: string): Promise<void> {
+    try {
+      await updateDoc(doc(db, 'users', workerId), {
+        status: 'inactive',
+        updatedAt: serverTimestamp(),
+      });
+    } catch (error) {
+      console.error('Erro ao remover trabalhador:', error);
+      throw error;
+    }
+  }
+
+  async sendInvite(email: string): Promise<void> {
+    try {
+      const currentUser = await AuthService.getCurrentUser();
+      if (!currentUser) {
+        throw new Error('Usuário não autenticado');
+      }
+
+      await addDoc(collection(db, 'invites'), {
+        email,
+        status: 'pending',
+        siteId: currentUser.siteId,
+        createdAt: serverTimestamp(),
+      });
+    } catch (error) {
+      console.error('Erro ao enviar convite:', error);
+      throw error;
+    }
+  }
+
+  async cancelInvite(inviteId: string): Promise<void> {
+    try {
+      await updateDoc(doc(db, 'invites', inviteId), {
+        status: 'rejected',
+        updatedAt: serverTimestamp(),
+      });
+    } catch (error) {
+      console.error('Erro ao cancelar convite:', error);
+      throw error;
+    }
+  }
+
+  async getSites(): Promise<Site[]> {
+    try {
+      const sitesQuery = query(
+        collection(db, 'sites'),
+        where('status', '==', 'active')
+      );
+      const snapshot = await getDocs(sitesQuery);
+      return snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+      } as Site));
+    } catch (error) {
+      console.error('Erro ao obter obras:', error);
+      throw error;
+    }
+  }
+
+  static async getSiteById(siteId: string): Promise<Site | null> {
+    try {
+      const siteDoc = await getDoc(doc(db, 'sites', siteId));
+      if (!siteDoc.exists()) {
+        return null;
+      }
+      return {
+        id: siteDoc.id,
+        ...siteDoc.data(),
+      } as Site;
+    } catch (error) {
+      console.error('Erro ao obter canteiro:', error);
+      throw error;
+    }
+  }
+
+  static async updateSite(siteId: string, updates: Partial<Site>): Promise<void> {
+    try {
+      await updateDoc(doc(db, 'sites', siteId), {
+        ...updates,
+        updatedAt: serverTimestamp(),
+      });
+    } catch (error) {
+      console.error('Erro ao atualizar canteiro:', error);
+      throw error;
+    }
+  }
+
+  static async deleteSite(siteId: string): Promise<void> {
+    try {
+      await deleteDoc(doc(db, 'sites', siteId));
+    } catch (error) {
+      console.error('Erro ao deletar canteiro:', error);
+      throw error;
+    }
   }
 }
+
+export default AuthService.getInstance();
