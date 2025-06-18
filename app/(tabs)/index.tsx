@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Alert,
   RefreshControl,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
@@ -16,8 +17,10 @@ import {
   CircleAlert as AlertCircle,
   User,
   Calendar,
+  Trash2,
+  X,
 } from 'lucide-react-native';
-import TaskService, { Task } from '@/services/TaskService';
+import taskService, { Task } from '@/services/TaskService';
 import { AuthService } from '@/services/AuthService';
 import { TaskModal } from '@/components/TaskModal';
 
@@ -29,6 +32,8 @@ export default function TasksScreen() {
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+  const [taskToDelete, setTaskToDelete] = useState<string | null>(null);
 
   useEffect(() => {
     if (isInitialized) return;
@@ -53,7 +58,7 @@ export default function TasksScreen() {
   const loadTasks = async () => {
     try {
       console.log('Carregando tarefas...');
-      const siteTasks = await TaskService.getTasks();
+      const siteTasks = await taskService.getTasks();
       console.log('Tarefas carregadas:', siteTasks);
       setTasks(siteTasks);
     } catch (error) {
@@ -83,14 +88,14 @@ export default function TasksScreen() {
   const handleTaskSave = async (taskData: Partial<Task>) => {
     try {
       if (selectedTask) {
-        await TaskService.updateTask(selectedTask.id, taskData);
+        await taskService.updateTask(selectedTask.id, taskData);
       } else {
         const currentSite = await AuthService.getCurrentSite();
         if (!currentSite) {
           Alert.alert('Erro', 'Nenhum canteiro selecionado.');
           return;
         }
-        await TaskService.createTask({
+        await taskService.createTask({
           ...taskData,
           siteId: currentSite.id,
         } as Omit<Task, 'id' | 'createdAt'>);
@@ -100,6 +105,39 @@ export default function TasksScreen() {
     } catch (error) {
       Alert.alert('Erro', 'Erro ao salvar tarefa.');
     }
+  };
+
+  const handleDeleteTask = async (taskId: string) => {
+    try {
+      console.log('Tentando excluir tarefa:', taskId);
+      setTaskToDelete(taskId);
+      setDeleteModalVisible(true);
+    } catch (error) {
+      console.error('Erro ao excluir tarefa:', error);
+      Alert.alert('Erro', 'Erro ao excluir tarefa. Por favor, tente novamente.');
+    }
+  };
+
+  const confirmDelete = async () => {
+    if (!taskToDelete) return;
+    
+    try {
+      console.log('Confirmada exclusão da tarefa:', taskToDelete);
+      await taskService.deleteTask(taskToDelete);
+      console.log('Tarefa excluída com sucesso');
+      await loadTasks();
+      setDeleteModalVisible(false);
+      setTaskToDelete(null);
+      Alert.alert('Sucesso', 'Tarefa excluída com sucesso.');
+    } catch (error) {
+      console.error('Erro ao excluir tarefa:', error);
+      Alert.alert('Erro', 'Erro ao excluir tarefa. Por favor, tente novamente.');
+    }
+  };
+
+  const cancelDelete = () => {
+    setDeleteModalVisible(false);
+    setTaskToDelete(null);
   };
 
   const getStatusIcon = (status: string) => {
@@ -150,9 +188,22 @@ export default function TasksScreen() {
             ]}
           />
         </View>
-        <View style={styles.statusContainer}>
-          {getStatusIcon(item.status)}
-          <Text style={styles.statusText}>{getStatusText(item.status)}</Text>
+        <View style={styles.taskActions}>
+          <View style={styles.statusContainer}>
+            {getStatusIcon(item.status)}
+            <Text style={styles.statusText}>{getStatusText(item.status)}</Text>
+          </View>
+          {userRole === 'admin' && (
+            <TouchableOpacity
+              onPress={(e) => {
+                e.stopPropagation();
+                handleDeleteTask(item.id);
+              }}
+              style={styles.deleteButton}
+            >
+              <Trash2 size={20} color="#EF4444" />
+            </TouchableOpacity>
+          )}
         </View>
       </View>
 
@@ -224,6 +275,41 @@ export default function TasksScreen() {
         }
         showsVerticalScrollIndicator={false}
       />
+
+      <Modal
+        visible={deleteModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={cancelDelete}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Confirmar exclusão</Text>
+              <TouchableOpacity onPress={cancelDelete} style={styles.closeButton}>
+                <X size={24} color="#6B7280" />
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.modalText}>
+              Tem certeza que deseja excluir esta tarefa?
+            </Text>
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={cancelDelete}
+              >
+                <Text style={styles.cancelButtonText}>Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.deleteButton]}
+                onPress={confirmDelete}
+              >
+                <Text style={styles.deleteButtonText}>Excluir</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       <TaskModal
         visible={modalVisible}
@@ -320,6 +406,11 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     marginLeft: 8,
   },
+  taskActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   statusContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -370,5 +461,67 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: 'Inter-Regular',
     color: '#6B7280',
+  },
+  deleteButton: {
+    padding: 8,
+    borderRadius: 8,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 24,
+    width: '90%',
+    maxWidth: 400,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#111827',
+  },
+  closeButton: {
+    padding: 4,
+  },
+  modalText: {
+    fontSize: 16,
+    color: '#4B5563',
+    marginBottom: 24,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 12,
+  },
+  modalButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 6,
+  },
+  cancelButton: {
+    backgroundColor: '#F3F4F6',
+  },
+  deleteButton: {
+    backgroundColor: '#EF4444',
+  },
+  deleteButtonText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  cancelButtonText: {
+    color: '#4B5563',
+    fontSize: 14,
+    fontWeight: '500',
   },
 });

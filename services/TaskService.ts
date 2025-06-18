@@ -28,6 +28,7 @@ export interface Task {
   completedAt?: string;
   dueDate?: string;
   photos: string[];
+  videos: string[];
   area: string;
 }
 
@@ -88,6 +89,7 @@ class TaskService {
         createdAt: now,
         updatedAt: now,
         photos: task.photos || [],
+        videos: task.videos || [],
         status: task.status || 'pending',
         priority: task.priority || 'medium',
       };

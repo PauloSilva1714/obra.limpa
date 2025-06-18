@@ -9,8 +9,10 @@ import {
   ScrollView,
   Alert,
   Image,
+  Platform,
 } from 'react-native';
-import { X, Camera, User, Calendar, Flag, MapPin, ChevronDown } from 'lucide-react-native';
+import { X, Camera, User, Calendar, Flag, MapPin, ChevronDown, ImagePlus, Video, Trash2 } from 'lucide-react-native';
+import * as ImagePicker from 'expo-image-picker';
 import type { Task } from '@/services/TaskService';
 import { AuthService } from '@/services/AuthService';
 
@@ -35,6 +37,7 @@ export function TaskModal({ visible, task, userRole, onSave, onClose }: TaskModa
     dueDate: '',
     area: '',
     photos: [] as string[],
+    videos: [] as string[],
   });
   const [showAreaPicker, setShowAreaPicker] = useState(false);
 
@@ -48,7 +51,8 @@ export function TaskModal({ visible, task, userRole, onSave, onClose }: TaskModa
         assignedTo: task.assignedTo,
         dueDate: task.dueDate,
         area: task.area,
-        photos: task.photos,
+        photos: task.photos || [],
+        videos: task.videos || [],
       });
     } else {
       // Reset form for new task
@@ -61,6 +65,7 @@ export function TaskModal({ visible, task, userRole, onSave, onClose }: TaskModa
         dueDate: new Date().toISOString().split('T')[0],
         area: '',
         photos: [],
+        videos: [],
       });
     }
   }, [task, visible]);
@@ -125,6 +130,127 @@ export function TaskModal({ visible, task, userRole, onSave, onClose }: TaskModa
       </Text>
     </TouchableOpacity>
   );
+
+  const pickImage = async () => {
+    try {
+      if (Platform.OS === 'web') {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/*';
+        input.multiple = true;
+        
+        input.onchange = (e: Event) => {
+          const files = (e.target as HTMLInputElement).files;
+          if (files) {
+            const newPhotos = Array.from(files).map(file => URL.createObjectURL(file));
+            setFormData(prev => ({
+              ...prev,
+              photos: [...prev.photos, ...newPhotos]
+            }));
+          }
+        };
+        
+        input.click();
+        return;
+      }
+
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      
+      if (status !== 'granted') {
+        Alert.alert('Permissão necessária', 'Precisamos de permissão para acessar suas fotos.');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0].uri) {
+        setFormData(prev => ({
+          ...prev,
+          photos: [...prev.photos, result.assets[0].uri]
+        }));
+      }
+    } catch (error) {
+      console.error('Erro ao selecionar imagem:', error);
+      Alert.alert('Erro', 'Não foi possível selecionar a imagem.');
+    }
+  };
+
+  const pickVideo = async () => {
+    try {
+      if (Platform.OS === 'web') {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'video/*';
+        input.multiple = true;
+        
+        input.onchange = (e: Event) => {
+          const files = (e.target as HTMLInputElement).files;
+          if (files) {
+            const newVideos = Array.from(files).map(file => URL.createObjectURL(file));
+            setFormData(prev => ({
+              ...prev,
+              videos: [...prev.videos, ...newVideos]
+            }));
+          }
+        };
+        
+        input.click();
+        return;
+      }
+
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      
+      if (status !== 'granted') {
+        Alert.alert('Permissão necessária', 'Precisamos de permissão para acessar seus vídeos.');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Videos,
+        allowsEditing: true,
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0].uri) {
+        setFormData(prev => ({
+          ...prev,
+          videos: [...prev.videos, result.assets[0].uri]
+        }));
+      }
+    } catch (error) {
+      console.error('Erro ao selecionar vídeo:', error);
+      Alert.alert('Erro', 'Não foi possível selecionar o vídeo.');
+    }
+  };
+
+  const removeMedia = (type: 'photo' | 'video', index: number) => {
+    if (type === 'photo') {
+      const newPhotos = [...formData.photos];
+      if (Platform.OS === 'web') {
+        URL.revokeObjectURL(newPhotos[index]);
+      }
+      newPhotos.splice(index, 1);
+      setFormData(prev => ({
+        ...prev,
+        photos: newPhotos
+      }));
+    } else {
+      const newVideos = [...formData.videos];
+      if (Platform.OS === 'web') {
+        URL.revokeObjectURL(newVideos[index]);
+      }
+      newVideos.splice(index, 1);
+      setFormData(prev => ({
+        ...prev,
+        videos: newVideos
+      }));
+    }
+  };
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
@@ -223,21 +349,63 @@ export function TaskModal({ visible, task, userRole, onSave, onClose }: TaskModa
             />
           </View>
 
-          {formData.photos.length > 0 && (
-            <View style={styles.section}>
-              <Text style={styles.label}>
-                <Camera size={16} color="#6B7280" style={styles.labelIcon} />
-                Fotos ({formData.photos.length})
-              </Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                <View style={styles.photosContainer}>
-                  {formData.photos.map((photo, index) => (
-                    <Image key={index} source={{ uri: photo }} style={styles.photo} />
-                  ))}
-                </View>
-              </ScrollView>
+          <View style={styles.section}>
+            <Text style={styles.label}>
+              <Camera size={16} color="#6B7280" style={styles.labelIcon} />
+              Mídia
+            </Text>
+            <View style={styles.mediaButtons}>
+              <TouchableOpacity 
+                style={styles.mediaButton} 
+                onPress={pickImage}
+                disabled={isReadOnly}
+              >
+                <ImagePlus size={20} color="#6B7280" />
+                <Text style={styles.mediaButtonText}>Adicionar Foto</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.mediaButton} 
+                onPress={pickVideo}
+                disabled={isReadOnly}
+              >
+                <Video size={20} color="#6B7280" />
+                <Text style={styles.mediaButtonText}>Adicionar Vídeo</Text>
+              </TouchableOpacity>
             </View>
-          )}
+
+            {(formData.photos.length > 0 || formData.videos.length > 0) && (
+              <View style={styles.mediaContainer}>
+                {formData.photos.map((photo, index) => (
+                  <View key={`photo-${index}`} style={styles.mediaItem}>
+                    <Image source={{ uri: photo }} style={styles.mediaPreview} />
+                    {!isReadOnly && (
+                      <TouchableOpacity 
+                        style={styles.removeMediaButton}
+                        onPress={() => removeMedia('photo', index)}
+                      >
+                        <Trash2 size={16} color="#EF4444" />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                ))}
+                {formData.videos.map((video, index) => (
+                  <View key={`video-${index}`} style={styles.mediaItem}>
+                    <View style={styles.videoPreview}>
+                      <Video size={24} color="#6B7280" />
+                    </View>
+                    {!isReadOnly && (
+                      <TouchableOpacity 
+                        style={styles.removeMediaButton}
+                        onPress={() => removeMedia('video', index)}
+                      >
+                        <Trash2 size={16} color="#EF4444" />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                ))}
+              </View>
+            )}
+          </View>
         </ScrollView>
 
         <View style={styles.footer}>
@@ -495,5 +663,66 @@ const styles = StyleSheet.create({
   pickerOptionText: {
     fontSize: 16,
     color: '#374151',
+  },
+  mediaButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 8,
+  },
+  mediaButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    padding: 12,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 8,
+    flex: 1,
+  },
+  mediaButtonText: {
+    color: '#4B5563',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  mediaContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginTop: 16,
+  },
+  mediaItem: {
+    position: 'relative',
+    width: 100,
+    height: 100,
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  mediaPreview: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 8,
+  },
+  videoPreview: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#F3F4F6',
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  removeMediaButton: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 4,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
   },
 });
