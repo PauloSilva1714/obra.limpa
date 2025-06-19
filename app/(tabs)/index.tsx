@@ -20,6 +20,7 @@ import {
   Trash2,
   X,
 } from 'lucide-react-native';
+import { Feather } from '@expo/vector-icons';
 import taskService, { Task } from '@/services/TaskService';
 import { AuthService } from '@/services/AuthService';
 import { TaskModal } from '@/components/TaskModal';
@@ -34,6 +35,7 @@ export default function TasksScreen() {
   const [isInitialized, setIsInitialized] = useState(false);
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
   const [taskToDelete, setTaskToDelete] = useState<string | null>(null);
+  const [detailsMode, setDetailsMode] = useState(false);
 
   useEffect(() => {
     if (isInitialized) return;
@@ -75,8 +77,15 @@ export default function TasksScreen() {
     loadTasks();
   };
 
+  const handleTaskDetails = (task: Task) => {
+    setSelectedTask(task);
+    setDetailsMode(true);
+    setModalVisible(true);
+  };
+
   const handleTaskPress = (task: Task) => {
     setSelectedTask(task);
+    setDetailsMode(false);
     setModalVisible(true);
   };
 
@@ -114,13 +123,16 @@ export default function TasksScreen() {
       setDeleteModalVisible(true);
     } catch (error) {
       console.error('Erro ao excluir tarefa:', error);
-      Alert.alert('Erro', 'Erro ao excluir tarefa. Por favor, tente novamente.');
+      Alert.alert(
+        'Erro',
+        'Erro ao excluir tarefa. Por favor, tente novamente.'
+      );
     }
   };
 
   const confirmDelete = async () => {
     if (!taskToDelete) return;
-    
+
     try {
       console.log('Confirmada exclusão da tarefa:', taskToDelete);
       await taskService.deleteTask(taskToDelete);
@@ -131,7 +143,10 @@ export default function TasksScreen() {
       Alert.alert('Sucesso', 'Tarefa excluída com sucesso.');
     } catch (error) {
       console.error('Erro ao excluir tarefa:', error);
-      Alert.alert('Erro', 'Erro ao excluir tarefa. Por favor, tente novamente.');
+      Alert.alert(
+        'Erro',
+        'Erro ao excluir tarefa. Por favor, tente novamente.'
+      );
     }
   };
 
@@ -174,65 +189,88 @@ export default function TasksScreen() {
   };
 
   const renderTaskItem = ({ item }: { item: Task }) => (
-    <TouchableOpacity
-      style={styles.taskCard}
-      onPress={() => handleTaskPress(item)}
-    >
-      <View style={styles.taskHeader}>
-        <View style={styles.taskTitleContainer}>
-          <Text style={styles.taskTitle}>{item.title}</Text>
-          <View
-            style={[
-              styles.priorityDot,
-              { backgroundColor: getPriorityColor(item.priority) },
-            ]}
-          />
-        </View>
-        <View style={styles.taskActions}>
-          <View style={styles.statusContainer}>
-            {getStatusIcon(item.status)}
-            <Text style={styles.statusText}>{getStatusText(item.status)}</Text>
+    <View style={styles.taskCard}>
+      <TouchableOpacity
+        style={{ flex: 1 }}
+        onPress={() => handleTaskPress(item)}
+      >
+        <View style={styles.taskHeader}>
+          <View style={styles.taskTitleContainer}>
+            <Text style={styles.taskTitle}>{item.title}</Text>
+            <View
+              style={[
+                styles.priorityDot,
+                { backgroundColor: getPriorityColor(item.priority) },
+              ]}
+            />
           </View>
-          {userRole === 'admin' && (
-            <TouchableOpacity
-              onPress={(e) => {
-                e.stopPropagation();
-                handleDeleteTask(item.id);
-              }}
-              style={styles.deleteButton}
-            >
-              <Trash2 size={20} color="#EF4444" />
-            </TouchableOpacity>
+          <View style={styles.taskActions}>
+            <View style={styles.statusContainer}>
+              {getStatusIcon(item.status)}
+              <Text style={styles.statusText}>{getStatusText(item.status)}</Text>
+            </View>
+            {userRole === 'admin' && (
+              <TouchableOpacity
+                onPress={(e) => {
+                  e.stopPropagation();
+                  handleDeleteTask(item.id);
+                }}
+                style={styles.deleteIconButton}
+              >
+                <Trash2 size={20} color="#EF4444" />
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+
+        <Text style={styles.taskDescription} numberOfLines={2}>
+          {item.description}
+        </Text>
+
+        <View style={styles.taskMeta}>
+          <View style={styles.metaItem}>
+            <User size={14} color="#6B7280" />
+            <Text style={styles.metaText}>{item.assignedTo}</Text>
+          </View>
+          <View style={styles.metaItem}>
+            <Calendar size={14} color="#6B7280" />
+            <Text style={styles.metaText}>
+              {item.dueDate
+                ? new Date(item.dueDate).toLocaleDateString('pt-BR')
+                : 'Sem data'}
+            </Text>
+          </View>
+          {item.status === 'completed' && item.completedAt && (
+            <View style={styles.metaItem}>
+              <Calendar size={14} color="#10B981" />
+              <Text style={[styles.metaText, { color: '#10B981' }]}>
+                Finalizada: {(() => {
+                  try {
+                    return new Date(item.completedAt).toLocaleDateString('pt-BR');
+                  } catch (error) {
+                    console.error('Erro ao formatar data de finalização:', error);
+                    return 'Data inválida';
+                  }
+                })()}
+              </Text>
+            </View>
           )}
         </View>
-      </View>
 
-      <Text style={styles.taskDescription} numberOfLines={2}>
-        {item.description}
-      </Text>
-
-      <View style={styles.taskMeta}>
-        <View style={styles.metaItem}>
-          <User size={14} color="#6B7280" />
-          <Text style={styles.metaText}>{item.assignedTo}</Text>
+        <View style={styles.taskFooter}>
+          <Text style={styles.areaTag}>{item.area}</Text>
+          {item.photos.length > 0 && (
+            <Text style={styles.photoCount}>{item.photos.length} foto(s)</Text>
+          )}
         </View>
-        <View style={styles.metaItem}>
-          <Calendar size={14} color="#6B7280" />
-          <Text style={styles.metaText}>
-            {item.dueDate
-              ? new Date(item.dueDate).toLocaleDateString('pt-BR')
-              : 'Sem data'}
-          </Text>
-        </View>
-      </View>
-
-      <View style={styles.taskFooter}>
-        <Text style={styles.areaTag}>{item.area}</Text>
-        {item.photos.length > 0 && (
-          <Text style={styles.photoCount}>{item.photos.length} foto(s)</Text>
-        )}
-      </View>
-    </TouchableOpacity>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={styles.detailsButton}
+        onPress={() => handleTaskDetails(item)}
+      >
+        <Text style={styles.detailsButtonText}>Ver detalhes</Text>
+      </TouchableOpacity>
+    </View>
   );
 
   const pendingTasks = tasks.filter((task) => task.status === 'pending');
@@ -268,7 +306,7 @@ export default function TasksScreen() {
       <FlatList
         data={tasks}
         renderItem={renderTaskItem}
-        keyExtractor={(item) => item.id}
+        keyExtractor={item => item.id}
         contentContainerStyle={styles.listContainer}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
@@ -286,7 +324,10 @@ export default function TasksScreen() {
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Confirmar exclusão</Text>
-              <TouchableOpacity onPress={cancelDelete} style={styles.closeButton}>
+              <TouchableOpacity
+                onPress={cancelDelete}
+                style={styles.closeButton}
+              >
                 <X size={24} color="#6B7280" />
               </TouchableOpacity>
             </View>
@@ -317,6 +358,7 @@ export default function TasksScreen() {
         userRole={userRole}
         onSave={handleTaskSave}
         onClose={() => setModalVisible(false)}
+        detailsMode={detailsMode}
       />
     </SafeAreaView>
   );
@@ -346,7 +388,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#2563EB',
     padding: 12,
     borderRadius: 12,
-    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+    boxShadow: '0px 2px 4px rgba(0,0,0,0.1)',
+    elevation: 3,
   },
   statsContainer: {
     flexDirection: 'row',
@@ -360,7 +403,8 @@ const styles = StyleSheet.create({
     padding: 16,
     marginHorizontal: 4,
     alignItems: 'center',
-    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+    boxShadow: '0px 2px 4px rgba(0,0,0,0.1)',
+    elevation: 3,
   },
   statNumber: {
     fontSize: 24,
@@ -381,7 +425,10 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
-    boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+    boxShadow: '0px 0px 6px rgba(0,0,0,0.1)',
+    elevation: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   taskHeader: {
     flexDirection: 'row',
@@ -462,7 +509,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Regular',
     color: '#6B7280',
   },
-  deleteButton: {
+  deleteIconButton: {
     padding: 8,
     borderRadius: 8,
   },
@@ -522,6 +569,21 @@ const styles = StyleSheet.create({
   cancelButtonText: {
     color: '#4B5563',
     fontSize: 14,
+    fontWeight: '500',
+  },
+  detailsButton: {
+    backgroundColor: '#2563EB',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    marginLeft: 12,
+    minWidth: 100,
+    alignItems: 'center',
+  },
+  detailsButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontFamily: 'Inter-Medium',
     fontWeight: '500',
   },
 });

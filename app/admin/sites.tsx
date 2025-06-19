@@ -163,7 +163,7 @@ export default function SitesScreen() {
         <FlatList
           data={sites}
           renderItem={renderSiteItem}
-          keyExtractor={(item) => item.id}
+          keyExtractor={item => item.id}
           contentContainerStyle={styles.list}
         />
       )}
@@ -203,7 +203,8 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 16,
     marginBottom: 12,
-    boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.1)',
+    boxShadow: '0px 2px 4px rgba(0,0,0,0.1)',
+    elevation: 3,
   },
   siteHeader: {
     flexDirection: 'row',

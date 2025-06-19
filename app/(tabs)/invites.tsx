@@ -1,272 +1,149 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, FlatList } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Mail, Plus, X, Check, Clock } from 'lucide-react-native';
-import { AuthService, Invite } from '@/services/AuthService';
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
+import { AuthService } from '@/services/AuthService';
+import { Trash2 } from 'lucide-react-native';
+
+interface Invite {
+  id: string;
+  email: string;
+  status: 'pending' | 'accepted' | 'rejected';
+  siteId: string;
+  createdAt: string;
+}
 
 export default function InvitesScreen() {
   const [invites, setInvites] = useState<Invite[]>([]);
-  const [newEmail, setNewEmail] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    loadInvites();
+    fetchInvites();
   }, []);
 
-  const loadInvites = async () => {
-    try {
-      const userInvites = await AuthService.getInvites();
-      setInvites(userInvites);
-    } catch (error) {
-      Alert.alert('Erro', 'Erro ao carregar convites.');
-    }
-  };
-
-  const handleCreateInvite = async () => {
-    if (!newEmail.trim()) {
-      Alert.alert('Erro', 'Por favor, informe um e-mail.');
-      return;
-    }
-
+  const fetchInvites = async () => {
     setLoading(true);
     try {
-      const currentSite = await AuthService.getCurrentSite();
-      if (!currentSite) {
-        throw new Error('Nenhuma obra selecionada');
-      }
-
-      await AuthService.createInvite(newEmail.trim(), currentSite.id);
-      setNewEmail('');
-      await loadInvites();
-      Alert.alert('Sucesso', 'Convite enviado com sucesso!');
+      const data = await AuthService.getInstance().getInvites();
+      setInvites(data);
     } catch (error) {
-      if (error instanceof Error) {
-        if (error.message === 'Já existe um convite pendente para este email') {
-          Alert.alert('Erro', 'Já existe um convite pendente para este e-mail.');
-        } else {
-          Alert.alert('Erro', error.message);
-        }
-      } else {
-        Alert.alert('Erro', 'Erro ao criar convite.');
-      }
+      Alert.alert('Erro', 'Não foi possível carregar os convites.');
     } finally {
       setLoading(false);
     }
   };
 
-  const getStatusIcon = (status: Invite['status']) => {
-    switch (status) {
-      case 'accepted':
-        return <Check size={20} color="#10B981" />;
-      case 'expired':
-        return <X size={20} color="#EF4444" />;
-      default:
-        return <Clock size={20} color="#F59E0B" />;
-    }
+  const handleCancelInvite = (inviteId: string) => {
+    Alert.alert(
+      'Cancelar convite',
+      'Tem certeza que deseja cancelar este convite?',
+      [
+        { text: 'Não', style: 'cancel' },
+        {
+          text: 'Sim', style: 'destructive', onPress: async () => {
+            try {
+              await AuthService.getInstance().cancelInvite(inviteId);
+              await fetchInvites();
+              Alert.alert('Sucesso', 'Convite cancelado com sucesso');
+            } catch (error) {
+              Alert.alert('Erro', 'Não foi possível cancelar o convite');
+            }
+          }
+        }
+      ]
+    );
   };
 
-  const getStatusText = (status: Invite['status']) => {
-    switch (status) {
-      case 'accepted':
-        return 'Aceito';
-      case 'expired':
-        return 'Expirado';
-      default:
-        return 'Pendente';
-    }
-  };
-
-  const renderInvite = ({ item }: { item: Invite }) => (
-    <View style={styles.inviteCard}>
+  const renderInviteItem = ({ item }: { item: Invite }) => (
+    <View style={styles.card}>
       <View style={styles.inviteHeader}>
-        <View style={styles.inviteInfo}>
-          <Mail size={20} color="#666666" style={styles.inviteIcon} />
+        <View>
           <Text style={styles.inviteEmail}>{item.email}</Text>
-        </View>
-        <View style={styles.inviteStatus}>
-          {getStatusIcon(item.status)}
-          <Text style={[styles.statusText, styles[`status${item.status}`]]}>
-            {getStatusText(item.status)}
+          <Text style={styles.inviteDate}>
+            Enviado em: {item.createdAt ? new Date(item.createdAt).toLocaleDateString() : '-'}
           </Text>
         </View>
+        {item.status === 'pending' && (
+          <TouchableOpacity style={styles.actionButton} onPress={() => handleCancelInvite(item.id)}>
+            <Trash2 size={20} color="#666" />
+          </TouchableOpacity>
+        )}
       </View>
-      <Text style={styles.inviteDate}>
-        Enviado em: {new Date(item.createdAt).toLocaleDateString()}
+      <Text style={[
+        styles.inviteStatus,
+        { color: item.status === 'pending' ? '#FF9800' : item.status === 'accepted' ? '#10B981' : '#666' }
+      ]}>
+        {item.status === 'pending' ? 'Pendente' : item.status === 'accepted' ? 'Aceito' : 'Cancelado'}
       </Text>
     </View>
   );
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Convites</Text>
-        <Text style={styles.subtitle}>Gerencie os convites para trabalhadores</Text>
-      </View>
-
-      <View style={styles.form}>
-        <View style={styles.inputContainer}>
-          <Mail size={20} color="#666666" style={styles.inputIcon} />
-          <TextInput
-            style={styles.input}
-            placeholder="E-mail do trabalhador"
-            value={newEmail}
-            onChangeText={setNewEmail}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            placeholderTextColor="#999999"
-          />
-        </View>
-
-        <TouchableOpacity 
-          style={[styles.createButton, loading && styles.buttonDisabled]} 
-          onPress={handleCreateInvite}
-          disabled={loading}
-        >
-          <Plus size={20} color="#FFFFFF" style={styles.buttonIcon} />
-          <Text style={styles.createButtonText}>
-            {loading ? 'Enviando...' : 'Enviar Convite'}
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      <FlatList
-        data={invites}
-        renderItem={renderInvite}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.invitesList}
-        ListEmptyComponent={
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyStateText}>
-              Nenhum convite enviado ainda
-            </Text>
-          </View>
-        }
-      />
-    </SafeAreaView>
+    <View style={styles.container}>
+      <Text style={styles.title}>Convites</Text>
+      {loading ? (
+        <ActivityIndicator size="large" color="#F97316" style={{ marginTop: 32 }} />
+      ) : invites.length === 0 ? (
+        <Text style={styles.subtitle}>Nenhum convite encontrado.</Text>
+      ) : (
+        <FlatList
+          data={invites}
+          renderItem={renderInviteItem}
+          keyExtractor={item => item.id}
+          contentContainerStyle={styles.list}
+        />
+      )}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
-  },
-  header: {
-    padding: 24,
-    backgroundColor: '#F97316',
+    backgroundColor: '#F3F4F6',
+    padding: 16,
   },
   title: {
-    fontSize: 28,
-    fontFamily: 'Inter-Bold',
-    color: '#FFFFFF',
+    fontSize: 24,
+    fontWeight: '600',
+    color: '#111827',
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 16,
-    fontFamily: 'Inter-Regular',
-    color: 'rgba(255, 255, 255, 0.9)',
+    color: '#6B7280',
+    marginTop: 32,
+    textAlign: 'center',
   },
-  form: {
-    padding: 24,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+  list: {
+    paddingVertical: 8,
   },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F8F9FA',
-    borderRadius: 12,
-    marginBottom: 16,
-    paddingHorizontal: 16,
-    height: 56,
-  },
-  inputIcon: {
-    marginRight: 12,
-  },
-  input: {
-    flex: 1,
-    fontSize: 16,
-    fontFamily: 'Inter-Regular',
-    color: '#333333',
-  },
-  createButton: {
-    backgroundColor: '#F97316',
-    borderRadius: 12,
-    height: 56,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
-  buttonIcon: {
-    marginRight: 8,
-  },
-  createButtonText: {
-    fontSize: 16,
-    fontFamily: 'Inter-SemiBold',
-    color: '#FFFFFF',
-  },
-  invitesList: {
-    padding: 24,
-  },
-  inviteCard: {
-    backgroundColor: '#F8F9FA',
-    borderRadius: 12,
+  card: {
+    backgroundColor: '#fff',
+    borderRadius: 8,
     padding: 16,
-    marginBottom: 16,
+    marginBottom: 12,
+    boxShadow: '0px 2px 4px rgba(0,0,0,0.1)',
   },
   inviteHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     marginBottom: 8,
-  },
-  inviteInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  inviteIcon: {
-    marginRight: 8,
   },
   inviteEmail: {
     fontSize: 16,
-    fontFamily: 'Inter-Medium',
-    color: '#333333',
-  },
-  inviteStatus: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  statusText: {
-    fontSize: 14,
-    fontFamily: 'Inter-Medium',
-    marginLeft: 4,
-  },
-  statuspending: {
-    color: '#F59E0B',
-  },
-  statusaccepted: {
-    color: '#10B981',
-  },
-  statusexpired: {
-    color: '#EF4444',
+    fontWeight: '500',
+    marginBottom: 4,
   },
   inviteDate: {
+    fontSize: 12,
+    color: '#666',
+  },
+  inviteStatus: {
     fontSize: 14,
-    fontFamily: 'Inter-Regular',
-    color: '#666666',
+    fontWeight: '500',
   },
-  emptyState: {
-    padding: 24,
-    alignItems: 'center',
-  },
-  emptyStateText: {
-    fontSize: 16,
-    fontFamily: 'Inter-Regular',
-    color: '#666666',
-    textAlign: 'center',
+  actionButton: {
+    padding: 8,
+    marginLeft: 8,
   },
 }); 

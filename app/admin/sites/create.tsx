@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { ArrowLeft } from 'lucide-react-native';
-import AuthService from '@/services/AuthService';
+import { AuthService } from '@/services/AuthService';
 
 export default function CreateSiteScreen() {
   const [name, setName] = useState('');
@@ -25,7 +25,7 @@ export default function CreateSiteScreen() {
 
     try {
       setLoading(true);
-      await AuthService.createSite({
+      await AuthService.getInstance().createSite({
         name: name.trim(),
         address: address.trim(),
         status: 'active',

@@ -157,20 +157,9 @@ export default function SiteSelectionScreen() {
         
         <FlatList
           data={sites}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              style={styles.siteCard}
-              onPress={() => handleSiteSelection(item)}
-            >
-              <View style={styles.siteInfo}>
-                <Text style={styles.siteName}>{item.name}</Text>
-                <Text style={styles.siteAddress}>{item.address}</Text>
-              </View>
-              <ChevronRight size={24} color="#6B7280" />
-            </TouchableOpacity>
-          )}
-          contentContainerStyle={styles.siteList}
+          renderItem={renderSiteItem}
+          keyExtractor={item => item.id}
+          contentContainerStyle={styles.list}
         />
       </View>
 
@@ -230,7 +219,7 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     marginBottom: 16,
   },
-  siteList: {
+  list: {
     gap: 12,
   },
   siteCard: {

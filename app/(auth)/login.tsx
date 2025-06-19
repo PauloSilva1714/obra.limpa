@@ -68,7 +68,7 @@ export default function LoginScreen() {
           <View style={styles.logoContainer}>
             <Building2 size={48} color="#FFFFFF" strokeWidth={2} />
           </View>
-          <Text style={styles.title}>Gestão de Obras</Text>
+          <Text style={styles.title}>Obra Limpa</Text>
           <Text style={styles.subtitle}>Sistema de Limpeza e Organização</Text>
         </View>
 
@@ -130,7 +130,6 @@ export default function LoginScreen() {
             </TouchableOpacity>
           </View>
         </View>
-        <View style={styles.disabledView} />
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -239,8 +238,5 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Medium',
     color: '#374151',
     textAlign: 'center',
-  },
-  disabledView: {
-    pointerEvents: 'none',
   },
 });

@@ -313,7 +313,10 @@ export class AuthService {
       }
 
       const invitesSnapshot = await getDocs(invitesQuery);
-      return invitesSnapshot.docs.map((doc) => doc.data() as Invite);
+      return invitesSnapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }) as Invite);
     } catch (error) {
       console.error('Get invites error:', error);
       return [];
@@ -490,10 +493,22 @@ export class AuthService {
         throw new Error('Usuário não autenticado');
       }
 
+      // Buscar o site selecionado no AsyncStorage ou usar o primeiro da lista
+      let siteId: string | undefined;
+      const selectedSite = await AsyncStorage.getItem(AuthService.SITE_KEY);
+      if (selectedSite) {
+        siteId = JSON.parse(selectedSite).id;
+      } else if (currentUser.sites && currentUser.sites.length > 0) {
+        siteId = currentUser.sites[0];
+      }
+      if (!siteId) {
+        throw new Error('Nenhum canteiro selecionado para o convite.');
+      }
+
       await addDoc(collection(db, 'invites'), {
         email,
         status: 'pending',
-        siteId: currentUser.siteId,
+        siteId,
         createdAt: serverTimestamp(),
       });
     } catch (error) {
@@ -504,12 +519,14 @@ export class AuthService {
 
   async cancelInvite(inviteId: string): Promise<void> {
     try {
+      console.log('[cancelInvite] Tentando cancelar convite:', inviteId);
       await updateDoc(doc(db, 'invites', inviteId), {
         status: 'rejected',
         updatedAt: serverTimestamp(),
       });
+      console.log('[cancelInvite] Convite cancelado com sucesso:', inviteId);
     } catch (error) {
-      console.error('Erro ao cancelar convite:', error);
+      console.error('[cancelInvite] Erro ao cancelar convite:', error);
       throw error;
     }
   }
@@ -527,6 +544,46 @@ export class AuthService {
       } as Site));
     } catch (error) {
       console.error('Erro ao obter obras:', error);
+      throw error;
+    }
+  }
+
+  async createSite(siteData: {
+    name: string;
+    address: string;
+    status: 'active' | 'inactive';
+  }): Promise<Site> {
+    try {
+      const currentUser = await AuthService.getCurrentUser();
+      if (!currentUser || currentUser.role !== 'admin') {
+        throw new Error('Apenas administradores podem criar obras');
+      }
+
+      const now = new Date().toISOString();
+      const newSite = {
+        ...siteData,
+        createdAt: now,
+        updatedAt: now,
+        createdBy: currentUser.id,
+      };
+
+      const docRef = await addDoc(collection(db, 'sites'), newSite);
+      
+      // Adicionar a obra à lista de obras do usuário
+      const userRef = doc(db, 'users', currentUser.id);
+      const userDoc = await getDoc(userRef);
+      if (userDoc.exists()) {
+        const userData = userDoc.data() as User;
+        const updatedSites = [...(userData.sites || []), docRef.id];
+        await updateDoc(userRef, { sites: updatedSites });
+      }
+
+      return {
+        id: docRef.id,
+        ...newSite,
+      } as Site;
+    } catch (error) {
+      console.error('Erro ao criar obra:', error);
       throw error;
     }
   }
@@ -611,5 +668,3 @@ export class AuthService {
     }
   }
 }
-
-export default AuthService.getInstance();

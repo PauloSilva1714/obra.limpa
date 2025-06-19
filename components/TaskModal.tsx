@@ -10,11 +10,14 @@ import {
   Alert,
   Image,
   Platform,
+  Dimensions,
 } from 'react-native';
 import { X, Camera, User, Calendar, Flag, MapPin, ChevronDown, ImagePlus, Video, Trash2 } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import type { Task } from '@/services/TaskService';
 import { AuthService } from '@/services/AuthService';
+import { onSnapshot, collection, query, where } from 'firebase/firestore';
+import { db } from '@/config/firebase';
 
 interface TaskModalProps {
   visible: boolean;
@@ -22,12 +25,12 @@ interface TaskModalProps {
   userRole: 'admin' | 'worker' | null;
   onSave: (task: Partial<Task>) => void;
   onClose: () => void;
+  detailsMode?: boolean;
 }
 
 const areas = ['Canteiro', 'Almoxarifado', 'Instalações', 'Área Externa', 'Escritório', 'Depósito'];
-const workers = ['João Silva', 'Maria Santos', 'Carlos Oliveira', 'Ana Costa', 'Pedro Silva'];
 
-export function TaskModal({ visible, task, userRole, onSave, onClose }: TaskModalProps) {
+export function TaskModal({ visible, task, userRole, onSave, onClose, detailsMode = false }: TaskModalProps) {
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -35,22 +38,26 @@ export function TaskModal({ visible, task, userRole, onSave, onClose }: TaskModa
     priority: 'medium' as Task['priority'],
     assignedTo: '',
     dueDate: '',
+    completedDate: '',
     area: '',
     photos: [] as string[],
     videos: [] as string[],
   });
   const [showAreaPicker, setShowAreaPicker] = useState(false);
+  const [fullscreenMedia, setFullscreenMedia] = useState<{ type: 'photo' | 'video'; url: string } | null>(null);
+  const [fullscreenVisible, setFullscreenVisible] = useState(false);
 
   useEffect(() => {
     if (task) {
       setFormData({
-        title: task.title,
-        description: task.description,
+        title: task.title || '',
+        description: task.description || '',
         status: task.status,
         priority: task.priority,
-        assignedTo: task.assignedTo,
-        dueDate: task.dueDate,
-        area: task.area,
+        assignedTo: task.assignedTo || '',
+        dueDate: task.dueDate || '',
+        completedDate: task.completedAt || '',
+        area: task.area || '',
         photos: task.photos || [],
         videos: task.videos || [],
       });
@@ -63,6 +70,7 @@ export function TaskModal({ visible, task, userRole, onSave, onClose }: TaskModa
         priority: 'medium',
         assignedTo: '',
         dueDate: new Date().toISOString().split('T')[0],
+        completedDate: '',
         area: '',
         photos: [],
         videos: [],
@@ -81,27 +89,54 @@ export function TaskModal({ visible, task, userRole, onSave, onClose }: TaskModa
       return;
     }
 
-    onSave(formData);
+    const taskData = { ...formData };
+    // Converter datas para YYYY-MM-DD antes de salvar
+    if (taskData.dueDate) {
+      taskData.dueDate = formatDateForStorage(taskData.dueDate);
+    }
+    if (taskData.completedDate) {
+      (taskData as any).completedAt = formatDateForStorage(taskData.completedDate);
+    }
+    delete (taskData as any).completedDate;
+    if (!(taskData as any).completedAt) {
+      delete (taskData as any).completedAt;
+    }
+    onSave(taskData);
   };
 
-  const isReadOnly = userRole === 'worker' && task?.status === 'completed';
+  const isReadOnly = detailsMode || (userRole === 'worker' && task?.status === 'completed');
   const isEditing = !!task;
   const canEdit = userRole === 'admin' || (userRole === 'worker' && !isReadOnly);
 
   const StatusButton = ({ status, label }: { status: Task['status']; label: string }) => (
     <TouchableOpacity
       style={[
-        styles.statusButton,
-        formData.status === status && styles.statusButtonActive,
-        isReadOnly && styles.statusButtonDisabled,
+        styles.modernStatusButton,
+        formData.status === status && styles.modernStatusButtonActive,
+        isReadOnly && styles.buttonDisabled,
       ]}
-      onPress={() => !isReadOnly && setFormData({ ...formData, status })}
+      onPress={() => {
+        if (!isReadOnly) {
+          const newFormData = { ...formData, status };
+          // Se o status for "completed", preencher automaticamente a data de finalização no formato DD/MM/AAAA
+          if (status === 'completed' && !formData.completedDate) {
+            const today = new Date();
+            const formattedDate = `${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth()+1).padStart(2, '0')}/${today.getFullYear()}`;
+            newFormData.completedDate = formattedDate;
+          }
+          // Se o status for alterado de "completed" para outro, limpar a data de finalização
+          if (formData.status === 'completed' && status !== 'completed') {
+            newFormData.completedDate = '';
+          }
+          setFormData(newFormData);
+        }
+      }}
       disabled={isReadOnly}
     >
       <Text
         style={[
-          styles.statusButtonText,
-          formData.status === status && styles.statusButtonTextActive,
+          styles.modernStatusButtonText,
+          formData.status === status && styles.modernStatusButtonTextActive,
         ]}
       >
         {label}
@@ -112,9 +147,9 @@ export function TaskModal({ visible, task, userRole, onSave, onClose }: TaskModa
   const PriorityButton = ({ priority, label, color }: { priority: Task['priority']; label: string; color: string }) => (
     <TouchableOpacity
       style={[
-        styles.priorityButton,
-        formData.priority === priority && { backgroundColor: color + '20', borderColor: color },
-        (!canEdit || isReadOnly) && styles.statusButtonDisabled,
+        styles.modernPriorityButton,
+        formData.priority === priority && { backgroundColor: color + '15', borderColor: color },
+        (!canEdit || isReadOnly) && styles.buttonDisabled,
       ]}
       onPress={() => canEdit && !isReadOnly && setFormData({ ...formData, priority })}
       disabled={!canEdit || isReadOnly}
@@ -122,7 +157,7 @@ export function TaskModal({ visible, task, userRole, onSave, onClose }: TaskModa
       <Flag size={16} color={formData.priority === priority ? color : '#6B7280'} />
       <Text
         style={[
-          styles.priorityButtonText,
+          styles.modernPriorityButtonText,
           formData.priority === priority && { color },
         ]}
       >
@@ -252,162 +287,496 @@ export function TaskModal({ visible, task, userRole, onSave, onClose }: TaskModa
     }
   };
 
+  const openFullscreenMedia = (type: 'photo' | 'video', url: string) => {
+    setFullscreenMedia({ type, url });
+    setFullscreenVisible(true);
+  };
+
+  const closeFullscreenMedia = () => {
+    setFullscreenVisible(false);
+    setFullscreenMedia(null);
+  };
+
+  const getStatusColor = (status: Task['status']) => {
+    switch (status) {
+      case 'completed':
+        return '#10B981';
+      case 'in_progress':
+        return '#F59E0B';
+      default:
+        return '#EF4444';
+    }
+  };
+
+  const getStatusText = (status: Task['status']) => {
+    switch (status) {
+      case 'completed':
+        return 'Concluída';
+      case 'in_progress':
+        return 'Em Andamento';
+      default:
+        return 'Pendente';
+    }
+  };
+
+  const getPriorityColor = (priority: Task['priority']) => {
+    switch (priority) {
+      case 'high':
+        return '#EF4444';
+      case 'medium':
+        return '#F59E0B';
+      default:
+        return '#10B981';
+    }
+  };
+
+  const getPriorityText = (priority: Task['priority']) => {
+    switch (priority) {
+      case 'high':
+        return 'Alta';
+      case 'medium':
+        return 'Média';
+      default:
+        return 'Baixa';
+    }
+  };
+
+  const formatDateForDisplay = (dateString: string): string => {
+    if (!dateString) return '';
+    
+    try {
+      // Se a data já está no formato YYYY-MM-DD, converter para DD/MM/YYYY
+      if (dateString.includes('-') && dateString.length === 10) {
+        const [year, month, day] = dateString.split('-');
+        return `${day}/${month}/${year}`;
+      }
+      
+      // Se é uma data válida, formatar
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return '';
+      
+      return date.toLocaleDateString('pt-BR');
+    } catch (error) {
+      console.error('Erro ao formatar data:', error);
+      return '';
+    }
+  };
+
+  const formatDateForStorage = (dateString: string): string => {
+    if (!dateString) return '';
+    
+    try {
+      // Se a data está no formato DD/MM/YYYY, converter para YYYY-MM-DD
+      if (dateString.includes('/') && dateString.length === 10) {
+        const [day, month, year] = dateString.split('/');
+        return `${year}-${month}-${day}`;
+      }
+      
+      // Se é uma data válida, retornar no formato YYYY-MM-DD
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return '';
+      
+      return date.toISOString().split('T')[0];
+    } catch (error) {
+      console.error('Erro ao formatar data para armazenamento:', error);
+      return '';
+    }
+  };
+
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
       <View style={styles.container}>
         <View style={styles.header}>
+          <View style={styles.headerContent}>
           <Text style={styles.title}>
-            {isEditing ? 'Editar Tarefa' : 'Nova Tarefa'}
+              {detailsMode ? 'Detalhes da Tarefa' : isEditing ? 'Editar Tarefa' : 'Nova Tarefa'}
           </Text>
+            {detailsMode && (
+              <View style={[styles.statusBadge, { backgroundColor: getStatusColor(formData.status) }]}>
+                <Text style={styles.statusBadgeText}>{getStatusText(formData.status)}</Text>
+              </View>
+            )}
+          </View>
           <TouchableOpacity style={styles.closeButton} onPress={onClose}>
             <X size={24} color="#6B7280" />
           </TouchableOpacity>
         </View>
 
         <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-          <View style={styles.section}>
-            <Text style={styles.label}>Título</Text>
+          {detailsMode ? (
+            // Layout moderno para modo detalhes
+            <View style={styles.detailsContainer}>
+              {/* Card Principal */}
+              <View style={styles.mainCard}>
+                <View style={styles.cardHeader}>
+                  <Text style={styles.cardTitle}>{formData.title}</Text>
+                  <View style={[styles.priorityBadge, { backgroundColor: getPriorityColor(formData.priority) }]}>
+                    <Text style={styles.priorityBadgeText}>{getPriorityText(formData.priority)}</Text>
+                  </View>
+                </View>
+
+                {/* Mídias integradas no card principal */}
+                {(formData.photos.length > 0 || formData.videos.length > 0) && (
+                  <View style={styles.inlineMediaSection}>
+                    <View style={styles.inlineMediaGrid}>
+                      {formData.photos.map((photo, index) => (
+                        <TouchableOpacity
+                          key={`photo-${index}`}
+                          style={styles.inlineMediaItem}
+                          onPress={() => openFullscreenMedia('photo', photo)}
+                        >
+                          <Image source={{ uri: photo }} style={styles.inlineMediaThumbnail} />
+                          <View style={styles.inlineMediaOverlay}>
+                            <Text style={styles.inlineMediaType}>📷</Text>
+                          </View>
+                        </TouchableOpacity>
+                      ))}
+                      {formData.videos.map((video, index) => (
+                        <TouchableOpacity
+                          key={`video-${index}`}
+                          style={styles.inlineMediaItem}
+                          onPress={() => openFullscreenMedia('video', video)}
+                        >
+                          <View style={styles.inlineVideoThumbnail}>
+                            <Video size={20} color="#FFFFFF" />
+                          </View>
+                          <View style={styles.inlineMediaOverlay}>
+                            <Text style={styles.inlineMediaType}>🎥</Text>
+                          </View>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                    <Text style={styles.inlineMediaHint}>Toque nas mídias para visualizar em tela cheia</Text>
+                  </View>
+                )}
+
+                <Text style={styles.descriptionText}>{formData.description}</Text>
+              </View>
+
+              {/* Card de Informações */}
+              <View style={styles.infoCard}>
+                <Text style={styles.sectionTitle}>Informações</Text>
+                <View style={styles.infoGrid}>
+                  <View style={styles.infoItem}>
+                    <View style={styles.infoIcon}>
+                      <User size={16} color="#6B7280" />
+                    </View>
+                    <View style={styles.infoContent}>
+                      <Text style={styles.infoLabel}>Responsável</Text>
+                      <Text style={styles.infoValue}>{formData.assignedTo || 'Não atribuído'}</Text>
+                    </View>
+                  </View>
+                  
+                  <View style={styles.infoItem}>
+                    <View style={styles.infoIcon}>
+                      <MapPin size={16} color="#6B7280" />
+                    </View>
+                    <View style={styles.infoContent}>
+                      <Text style={styles.infoLabel}>Local</Text>
+                      <Text style={styles.infoValue}>{formData.area || 'Não especificado'}</Text>
+                    </View>
+                  </View>
+                  
+                  <View style={styles.infoItem}>
+                    <View style={styles.infoIcon}>
+                      <Calendar size={16} color="#6B7280" />
+                    </View>
+                    <View style={styles.infoContent}>
+                      <Text style={styles.infoLabel}>Data de Entrada</Text>
+                      <Text style={styles.infoValue}>
+                        {formatDateForDisplay(formData.dueDate)}
+                      </Text>
+                    </View>
+                  </View>
+                  
+                  {formData.completedDate && (
+                    <View style={styles.infoItem}>
+                      <View style={styles.infoIcon}>
+                        <Calendar size={16} color="#6B7280" />
+                      </View>
+                      <View style={styles.infoContent}>
+                        <Text style={styles.infoLabel}>Data de Finalização</Text>
+                        <Text style={styles.infoValue}>
+                          {formatDateForDisplay(formData.completedDate)}
+                        </Text>
+                      </View>
+                    </View>
+                  )}
+                  
+                  <View style={styles.infoItem}>
+                    <View style={styles.infoIcon}>
+                      <Flag size={16} color="#6B7280" />
+                    </View>
+                    <View style={styles.infoContent}>
+                      <Text style={styles.infoLabel}>Prioridade</Text>
+                      <Text style={styles.infoValue}>{getPriorityText(formData.priority)}</Text>
+                    </View>
+                  </View>
+                </View>
+              </View>
+            </View>
+          ) : (
+            // Layout moderno para edição
+            <View style={styles.modernEditContainer}>
+              {/* Card Principal - Título e Descrição */}
+              <View style={styles.mainEditCard}>
+                <View style={styles.cardHeaderEdit}>
+                  <Text style={styles.cardTitle}>Informações Básicas</Text>
+                  <View style={styles.cardBadge}>
+                    <Text style={styles.cardBadgeText}>Obrigatório</Text>
+                  </View>
+                </View>
+                
+                <View style={styles.inputGroup}>
+                  <Text style={styles.modernLabel}>Título da Tarefa</Text>
             <TextInput
-              style={[styles.input, isReadOnly && styles.inputDisabled]}
+                    style={[styles.modernInput, isReadOnly && styles.inputDisabled]}
               value={formData.title}
               onChangeText={(text) => setFormData({ ...formData, title: text })}
-              placeholder="Digite o título da tarefa"
+                    placeholder="Digite um título claro e objetivo"
+                    placeholderTextColor="#9CA3AF"
               editable={!isReadOnly && userRole === 'admin'}
             />
           </View>
 
-          <View style={styles.section}>
-            <Text style={styles.label}>Descrição</Text>
+                <View style={styles.inputGroup}>
+                  <Text style={styles.modernLabel}>Descrição Detalhada</Text>
             <TextInput
-              style={[styles.textArea, isReadOnly && styles.inputDisabled]}
+                    style={[styles.modernTextArea, isReadOnly && styles.inputDisabled]}
               value={formData.description}
               onChangeText={(text) => setFormData({ ...formData, description: text })}
-              placeholder="Descreva a tarefa detalhadamente"
+                    placeholder="Descreva os detalhes, requisitos e especificações da tarefa"
+                    placeholderTextColor="#9CA3AF"
               multiline
               numberOfLines={4}
               editable={!isReadOnly && userRole === 'admin'}
             />
+                </View>
           </View>
 
-          <View style={styles.section}>
-            <Text style={styles.label}>Status</Text>
-            <View style={styles.statusContainer}>
+              {/* Card de Status e Prioridade */}
+              <View style={styles.statusPriorityCard}>
+                <View style={styles.cardHeaderEdit}>
+                  <Text style={styles.cardTitle}>Status e Prioridade</Text>
+                  <View style={styles.cardBadge}>
+                    <Text style={styles.cardBadgeText}>Configuração</Text>
+                  </View>
+                </View>
+
+                <View style={styles.inputGroup}>
+                  <Text style={styles.modernLabel}>Status Atual</Text>
+                  <View style={styles.modernStatusContainer}>
               <StatusButton status="pending" label="Pendente" />
               <StatusButton status="in_progress" label="Em Andamento" />
               <StatusButton status="completed" label="Concluída" />
             </View>
           </View>
 
-          <View style={styles.section}>
-            <Text style={styles.label}>Prioridade</Text>
-            <View style={styles.priorityContainer}>
+                <View style={styles.inputGroup}>
+                  <Text style={styles.modernLabel}>Nível de Prioridade</Text>
+                  <View style={styles.modernPriorityContainer}>
               <PriorityButton priority="low" label="Baixa" color="#10B981" />
               <PriorityButton priority="medium" label="Média" color="#F59E0B" />
               <PriorityButton priority="high" label="Alta" color="#EF4444" />
+                  </View>
             </View>
           </View>
 
-          <View style={styles.section}>
-            <Text style={styles.label}>
-              <User size={16} color="#6B7280" style={styles.labelIcon} />
-              Responsável
-            </Text>
+              {/* Card de Atribuição e Local */}
+              <View style={styles.assignmentCard}>
+                <View style={styles.cardHeaderEdit}>
+                  <Text style={styles.cardTitle}>Atribuição e Local</Text>
+                  <View style={styles.cardBadge}>
+                    <Text style={styles.cardBadgeText}>Organização</Text>
+                  </View>
+                </View>
+
+                <View style={styles.inputGroup}>
+                  <View style={styles.labelWithIcon}>
+                    <User size={16} color="#6B7280" />
+                    <Text style={styles.modernLabel}>Responsável pela Tarefa</Text>
+                  </View>
             <TextInput
-              style={[styles.input, userRole !== 'admin' && styles.inputDisabled]}
+                    style={[styles.modernInput, userRole !== 'admin' && styles.inputDisabled]}
               value={formData.assignedTo}
               onChangeText={(text) => setFormData({ ...formData, assignedTo: text })}
-              placeholder="Digite o nome do responsável"
+                    placeholder="Nome do responsável pela execução"
+                    placeholderTextColor="#9CA3AF"
               editable={userRole === 'admin'}
             />
           </View>
 
-          <View style={styles.section}>
-            <Text style={styles.label}>
-              <MapPin size={16} color="#6B7280" style={styles.labelIcon} />
-              Local
-            </Text>
+                <View style={styles.inputGroup}>
+                  <View style={styles.labelWithIcon}>
+                    <MapPin size={16} color="#6B7280" />
+                    <Text style={styles.modernLabel}>Local de Execução</Text>
+                  </View>
             <TextInput
-              style={[styles.input, userRole !== 'admin' && styles.inputDisabled]}
+                    style={[styles.modernInput, userRole !== 'admin' && styles.inputDisabled]}
               value={formData.area}
               onChangeText={(text) => setFormData({ ...formData, area: text })}
-              placeholder="Digite o local da tarefa"
+                    placeholder="Área ou local específico da tarefa"
+                    placeholderTextColor="#9CA3AF"
               editable={userRole === 'admin'}
             />
+                </View>
           </View>
 
-          <View style={styles.section}>
-            <Text style={styles.label}>
-              <Calendar size={16} color="#6B7280" style={styles.labelIcon} />
-              Entrada
-            </Text>
+              {/* Card de Datas */}
+              <View style={styles.datesCard}>
+                <View style={styles.cardHeaderEdit}>
+                  <Text style={styles.cardTitle}>Cronograma</Text>
+                  <View style={styles.cardBadge}>
+                    <Text style={styles.cardBadgeText}>Tempo</Text>
+                  </View>
+                </View>
+
+                <View style={styles.dateRow}>
+                  <View style={styles.dateInputGroup}>
+                    <View style={styles.dateLabelContainer}>
+                      <View style={styles.dateIconContainer}>
+                        <Calendar size={18} color="#F97316" />
+                      </View>
+                      <View style={styles.dateLabelContent}>
+                        <Text style={styles.dateLabel}>Data de Entrada</Text>
+                        <Text style={styles.dateSubtext}>Quando a tarefa foi criada</Text>
+                      </View>
+                    </View>
+                    <View style={styles.dateInputContainer}>
             <TextInput
-              style={[styles.input, isReadOnly && styles.inputDisabled]}
+                        style={[styles.modernDateInput, isReadOnly && styles.inputDisabled]}
               value={formData.dueDate}
               onChangeText={(text) => setFormData({ ...formData, dueDate: text })}
-              placeholder="DD-MM-AAAA"
+                        placeholder="DD/MM/AAAA"
+                        placeholderTextColor="#9CA3AF"
               editable={!isReadOnly && userRole === 'admin'}
             />
+                      <View style={styles.dateInputIcon}>
+                        <Calendar size={16} color="#6B7280" />
+                      </View>
+                    </View>
           </View>
 
-          <View style={styles.section}>
-            <Text style={styles.label}>
-              <Camera size={16} color="#6B7280" style={styles.labelIcon} />
-              Mídia
-            </Text>
-            <View style={styles.mediaButtons}>
+                  <View style={styles.dateInputGroup}>
+                    <View style={styles.dateLabelContainer}>
+                      <View style={[styles.dateIconContainer, styles.completedIconContainer]}>
+                        <Calendar size={18} color="#10B981" />
+                      </View>
+                      <View style={styles.dateLabelContent}>
+                        <Text style={styles.dateLabel}>Data de Finalização</Text>
+                        <Text style={styles.dateSubtext}>Quando foi concluída</Text>
+                      </View>
+                    </View>
+                    <View style={styles.dateInputContainer}>
+                      <TextInput
+                        style={[styles.modernDateInput, isReadOnly && styles.inputDisabled]}
+                        value={formData.completedDate}
+                        onChangeText={(text) => setFormData({ ...formData, completedDate: text })}
+                        placeholder="DD/MM/AAAA"
+                        placeholderTextColor="#9CA3AF"
+                        editable={!isReadOnly && userRole === 'admin'}
+                      />
+                      <View style={styles.dateInputIcon}>
+                        <Calendar size={16} color="#6B7280" />
+                      </View>
+                    </View>
+                  </View>
+                </View>
+              </View>
+
+              {/* Card de Mídia */}
+              <View style={styles.mediaCard}>
+                <View style={styles.cardHeaderEdit}>
+                  <Text style={styles.cardTitle}>Mídia e Documentação</Text>
+                  <View style={styles.cardBadge}>
+                    <Text style={styles.cardBadgeText}>Opcional</Text>
+                  </View>
+                </View>
+
+                <View style={styles.modernMediaButtons}>
               <TouchableOpacity 
-                style={styles.mediaButton} 
+                    style={[styles.modernMediaButton, isReadOnly && styles.buttonDisabled]} 
                 onPress={pickImage}
                 disabled={isReadOnly}
               >
+                    <View style={styles.mediaButtonIcon}>
                 <ImagePlus size={20} color="#6B7280" />
-                <Text style={styles.mediaButtonText}>Adicionar Foto</Text>
+                    </View>
+                    <Text style={styles.modernMediaButtonText}>Adicionar Fotos</Text>
+                    <Text style={styles.mediaButtonSubtext}>Documentar progresso</Text>
               </TouchableOpacity>
+                  
               <TouchableOpacity 
-                style={styles.mediaButton} 
+                    style={[styles.modernMediaButton, isReadOnly && styles.buttonDisabled]} 
                 onPress={pickVideo}
                 disabled={isReadOnly}
               >
+                    <View style={styles.mediaButtonIcon}>
                 <Video size={20} color="#6B7280" />
-                <Text style={styles.mediaButtonText}>Adicionar Vídeo</Text>
+                    </View>
+                    <Text style={styles.modernMediaButtonText}>Adicionar Vídeos</Text>
+                    <Text style={styles.mediaButtonSubtext}>Demonstrar processo</Text>
               </TouchableOpacity>
             </View>
 
             {(formData.photos.length > 0 || formData.videos.length > 0) && (
-              <View style={styles.mediaContainer}>
+                  <View style={styles.modernMediaContainer}>
+                    <Text style={styles.mediaSectionTitle}>Mídias Anexadas</Text>
+                    <View style={styles.modernMediaGrid}>
                 {formData.photos.map((photo, index) => (
-                  <View key={`photo-${index}`} style={styles.mediaItem}>
-                    <Image source={{ uri: photo }} style={styles.mediaPreview} />
+                        <View key={`photo-${index}`} style={styles.modernMediaItem}>
+                          <TouchableOpacity
+                            onPress={() => openFullscreenMedia('photo', photo)}
+                            style={styles.modernMediaTouchable}
+                          >
+                            <Image source={{ uri: photo }} style={styles.modernMediaPreview} />
+                            <View style={styles.mediaTypeBadge}>
+                              <Text style={styles.mediaTypeText}>📷</Text>
+                            </View>
+                          </TouchableOpacity>
                     {!isReadOnly && (
                       <TouchableOpacity 
-                        style={styles.removeMediaButton}
+                              style={styles.modernRemoveButton}
                         onPress={() => removeMedia('photo', index)}
                       >
-                        <Trash2 size={16} color="#EF4444" />
+                              <Trash2 size={14} color="#EF4444" />
                       </TouchableOpacity>
                     )}
                   </View>
                 ))}
                 {formData.videos.map((video, index) => (
-                  <View key={`video-${index}`} style={styles.mediaItem}>
-                    <View style={styles.videoPreview}>
+                        <View key={`video-${index}`} style={styles.modernMediaItem}>
+                          <TouchableOpacity
+                            onPress={() => openFullscreenMedia('video', video)}
+                            style={styles.modernMediaTouchable}
+                          >
+                            <View style={styles.modernVideoPreview}>
                       <Video size={24} color="#6B7280" />
+                              <Text style={styles.videoPlayText}>▶</Text>
                     </View>
+                            <View style={styles.mediaTypeBadge}>
+                              <Text style={styles.mediaTypeText}>🎥</Text>
+                            </View>
+                          </TouchableOpacity>
                     {!isReadOnly && (
                       <TouchableOpacity 
-                        style={styles.removeMediaButton}
+                              style={styles.modernRemoveButton}
                         onPress={() => removeMedia('video', index)}
                       >
-                        <Trash2 size={16} color="#EF4444" />
+                              <Trash2 size={14} color="#EF4444" />
                       </TouchableOpacity>
                     )}
                   </View>
                 ))}
+                    </View>
               </View>
             )}
           </View>
+            </View>
+          )}
         </ScrollView>
 
+        {!detailsMode && (
         <View style={styles.footer}>
           <TouchableOpacity style={styles.cancelButton} onPress={onClose}>
             <Text style={styles.cancelButtonText}>Cancelar</Text>
@@ -420,6 +789,7 @@ export function TaskModal({ visible, task, userRole, onSave, onClose }: TaskModa
             </TouchableOpacity>
           )}
         </View>
+        )}
 
         {/* Area Picker Modal */}
         <Modal
@@ -452,6 +822,65 @@ export function TaskModal({ visible, task, userRole, onSave, onClose }: TaskModa
             </View>
           </View>
         </Modal>
+
+        {/* Fullscreen Media Modal */}
+        {fullscreenMedia && (
+          <Modal
+            visible={fullscreenVisible}
+            transparent
+            animationType="fade"
+            onRequestClose={closeFullscreenMedia}
+          >
+            <TouchableOpacity 
+              style={styles.fullscreenOverlay} 
+              activeOpacity={1}
+              onPress={closeFullscreenMedia}
+            >
+              <View style={styles.fullscreenContainer}>
+                <TouchableOpacity 
+                  style={styles.fullscreenContent}
+                  activeOpacity={1}
+                  onPress={(e) => e.stopPropagation()}
+                >
+                  <TouchableOpacity 
+                    style={styles.closeFullscreenButton} 
+                    onPress={closeFullscreenMedia}
+                  >
+                    <X size={24} color="#FFFFFF" />
+                  </TouchableOpacity>
+                  
+                  {fullscreenMedia.type === 'photo' && (
+                    <Image 
+                      source={{ uri: fullscreenMedia.url }} 
+                      style={styles.fullscreenImage}
+                      resizeMode="contain"
+                    />
+                  )}
+                  
+                  {fullscreenMedia.type === 'video' && (
+                    <View style={styles.fullscreenVideoContainer}>
+                      {Platform.OS === 'web' ? (
+                        <video
+                          src={fullscreenMedia.url}
+                          controls
+                          style={styles.fullscreenVideo}
+                          autoPlay
+                        />
+                      ) : (
+                        <View style={styles.fullscreenVideoPlaceholder}>
+                          <Video size={48} color="#6B7280" />
+                          <Text style={styles.fullscreenVideoText}>
+                            Vídeo não suportado nesta plataforma
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </TouchableOpacity>
+          </Modal>
+        )}
       </View>
     </Modal>
   );
@@ -471,6 +900,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
     borderBottomColor: '#E5E7EB',
+  },
+  headerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   title: {
     fontSize: 20,
@@ -527,51 +960,6 @@ const styles = StyleSheet.create({
   statusContainer: {
     flexDirection: 'row',
     gap: 8,
-  },
-  statusButton: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#D1D5DB',
-    borderRadius: 8,
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  statusButtonActive: {
-    backgroundColor: '#F97316',
-    borderColor: '#F97316',
-  },
-  statusButtonDisabled: {
-    opacity: 0.5,
-  },
-  statusButtonText: {
-    fontSize: 14,
-    fontFamily: 'Inter-Medium',
-    color: '#6B7280',
-  },
-  statusButtonTextActive: {
-    color: '#FFFFFF',
-  },
-  priorityContainer: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  priorityButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#D1D5DB',
-    borderRadius: 8,
-    paddingVertical: 12,
-    gap: 8,
-  },
-  priorityButtonText: {
-    fontSize: 14,
-    fontFamily: 'Inter-Medium',
-    color: '#6B7280',
   },
   pickerContainer: {
     flexDirection: 'row',
@@ -696,6 +1084,15 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     overflow: 'hidden',
   },
+  mediaTouchable: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   mediaPreview: {
     width: '100%',
     height: '100%',
@@ -709,6 +1106,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  videoPlayText: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+  },
   removeMediaButton: {
     position: 'absolute',
     top: 4,
@@ -716,13 +1118,520 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     borderRadius: 12,
     padding: 4,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
+    boxShadow: '0px 2px 4px rgba(0,0,0,0.25)',
     elevation: 5,
+  },
+  fullscreenOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  fullscreenContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: '100%',
+    height: '100%',
+  },
+  fullscreenContent: {
+    width: '90%',
+    height: '80%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'relative',
+  },
+  closeFullscreenButton: {
+    position: 'absolute',
+    top: 20,
+    right: 20,
+    zIndex: 10,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    borderRadius: 20,
+    padding: 8,
+  },
+  fullscreenImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 12,
+  },
+  fullscreenVideoContainer: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#000000',
+    borderRadius: 12,
+  },
+  fullscreenVideoPlaceholder: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  fullscreenVideoText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#FFFFFF',
+    marginTop: 12,
+    textAlign: 'center',
+  },
+  fullscreenVideo: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 12,
+  },
+  detailsContainer: {
+    flex: 1,
+    padding: 20,
+  },
+  mainCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 24,
+    marginBottom: 20,
+    boxShadow: '0px 2px 8px rgba(0,0,0,0.1)',
+    elevation: 4,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  cardTitle: {
+    fontSize: 20,
+    fontFamily: 'Inter-Bold',
+    color: '#111827',
+    flex: 1,
+    marginRight: 12,
+  },
+  descriptionText: {
+    fontSize: 16,
+    fontFamily: 'Inter-Regular',
+    color: '#6B7280',
+    lineHeight: 24,
+  },
+  infoCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 24,
+    marginBottom: 20,
+    boxShadow: '0px 2px 8px rgba(0,0,0,0.1)',
+    elevation: 4,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontFamily: 'Inter-SemiBold',
+    color: '#111827',
+    marginBottom: 16,
+  },
+  infoGrid: {
+    gap: 16,
+  },
+  infoItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  infoIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: '#F3F4F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  infoContent: {
+    flex: 1,
+  },
+  infoLabel: {
+    fontSize: 12,
+    fontFamily: 'Inter-Medium',
+    color: '#6B7280',
+    marginBottom: 4,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  infoValue: {
+    fontSize: 16,
+    fontFamily: 'Inter-Medium',
+    color: '#111827',
+  },
+  inlineMediaSection: {
+    marginBottom: 20,
+    marginTop: 8,
+  },
+  inlineMediaGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 8,
+  },
+  inlineMediaItem: {
+    position: 'relative',
+    width: 120,
+    height: 120,
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  inlineMediaThumbnail: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 8,
+  },
+  inlineMediaOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    borderRadius: 8,
+  },
+  inlineMediaType: {
+    fontSize: 18,
+    color: '#FFFFFF',
+  },
+  inlineVideoThumbnail: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 8,
+    backgroundColor: '#1F2937',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  inlineMediaHint: {
+    fontSize: 12,
+    fontFamily: 'Inter-Regular',
+    color: '#6B7280',
+    textAlign: 'center',
+    fontStyle: 'italic',
+  },
+  statusBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  statusBadgeText: {
+    fontSize: 12,
+    fontFamily: 'Inter-SemiBold',
+    color: '#FFFFFF',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  priorityBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  priorityBadgeText: {
+    fontSize: 12,
+    fontFamily: 'Inter-SemiBold',
+    color: '#FFFFFF',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  modernEditContainer: {
+    flex: 1,
+    padding: 20,
+  },
+  mainEditCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 24,
+    marginBottom: 20,
+    boxShadow: '0px 2px 8px rgba(0,0,0,0.1)',
+    elevation: 4,
+  },
+  cardHeaderEdit: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 16,
+  },
+  cardBadge: {
+    padding: 4,
+    borderRadius: 20,
+    backgroundColor: '#F3F4F6',
+  },
+  cardBadgeText: {
+    fontSize: 12,
+    fontFamily: 'Inter-Medium',
+    color: '#6B7280',
+  },
+  inputGroup: {
+    marginBottom: 16,
+  },
+  modernLabel: {
+    fontSize: 16,
+    fontFamily: 'Inter-Medium',
+    color: '#374151',
+    marginBottom: 8,
+  },
+  modernInput: {
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    color: '#374151',
+    backgroundColor: '#FFFFFF',
+  },
+  modernTextArea: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontSize: 16,
+    fontFamily: 'Inter-Regular',
+    color: '#111827',
+    minHeight: 100,
+    textAlignVertical: 'top',
+  },
+  statusPriorityCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 24,
+    marginBottom: 20,
+    boxShadow: '0px 2px 8px rgba(0,0,0,0.1)',
+    elevation: 4,
+  },
+  modernStatusContainer: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  modernPriorityContainer: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  assignmentCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 24,
+    marginBottom: 20,
+    boxShadow: '0px 2px 8px rgba(0,0,0,0.1)',
+    elevation: 4,
+  },
+  labelWithIcon: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  datesCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 24,
+    marginBottom: 20,
+    boxShadow: '0px 2px 8px rgba(0,0,0,0.1)',
+    elevation: 4,
+  },
+  dateRow: {
+    flexDirection: 'row',
+    gap: 16,
+  },
+  dateInputGroup: {
+    flex: 1,
+  },
+  dateLabelContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  dateIconContainer: {
+    width: 24,
+    height: 24,
+    borderRadius: 8,
+    backgroundColor: '#F3F4F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  dateLabelContent: {
+    flex: 1,
+  },
+  dateLabel: {
+    fontSize: 12,
+    fontFamily: 'Inter-Medium',
+    color: '#6B7280',
+    marginBottom: 4,
+  },
+  dateSubtext: {
+    fontSize: 12,
+    fontFamily: 'Inter-Regular',
+    color: '#6B7280',
+  },
+  dateInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 8,
+    padding: 12,
+  },
+  dateInputIcon: {
+    width: 24,
+    height: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modernDateInput: {
+    borderWidth: 0,
+    padding: 0,
+    fontSize: 16,
+    color: '#374151',
+    backgroundColor: 'transparent',
+  },
+  completedIconContainer: {
+    backgroundColor: '#10B981',
+  },
+  mediaCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 24,
+    marginBottom: 20,
+    boxShadow: '0px 2px 8px rgba(0,0,0,0.1)',
+    elevation: 4,
+  },
+  modernMediaButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 16,
+  },
+  modernMediaButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    padding: 12,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 8,
+    flex: 1,
+  },
+  mediaButtonIcon: {
+    width: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modernMediaButtonText: {
+    color: '#4B5563',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  mediaButtonSubtext: {
+    fontSize: 12,
+    fontFamily: 'Inter-Regular',
+    color: '#6B7280',
+  },
+  modernMediaContainer: {
+    marginBottom: 16,
+  },
+  mediaSectionTitle: {
+    fontSize: 18,
+    fontFamily: 'Inter-SemiBold',
+    color: '#111827',
+    marginBottom: 8,
+  },
+  modernMediaGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 8,
+  },
+  modernMediaItem: {
+    position: 'relative',
+    width: 100,
+    height: 100,
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  modernMediaTouchable: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modernMediaPreview: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 8,
+  },
+  mediaTypeBadge: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    padding: 4,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+  },
+  mediaTypeText: {
+    fontSize: 12,
+    fontFamily: 'Inter-Medium',
+    color: '#FFFFFF',
+  },
+  modernRemoveButton: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 4,
+    boxShadow: '0px 2px 4px rgba(0,0,0,0.25)',
+    elevation: 5,
+  },
+  modernVideoPreview: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#F3F4F6',
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  buttonDisabled: {
+    opacity: 0.5,
+  },
+  modernStatusButton: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 8,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  modernStatusButtonActive: {
+    backgroundColor: '#F97316',
+    borderColor: '#F97316',
+  },
+  modernStatusButtonText: {
+    fontSize: 14,
+    fontFamily: 'Inter-Medium',
+    color: '#6B7280',
+  },
+  modernStatusButtonTextActive: {
+    color: '#FFFFFF',
+  },
+  modernPriorityButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 8,
+    paddingVertical: 12,
+    gap: 8,
+  },
+  modernPriorityButtonText: {
+    fontSize: 14,
+    fontFamily: 'Inter-Medium',
+    color: '#6B7280',
   },
 });

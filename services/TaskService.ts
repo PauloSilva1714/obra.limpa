@@ -45,6 +45,16 @@ class TaskService {
     return TaskService.instance;
   }
 
+  private validateMediaUrl(url: string): boolean {
+    if (!url) return false;
+    try {
+      new URL(url);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   async getTasks(): Promise<Task[]> {
     try {
       const currentSite = await AuthService.getCurrentSite();
@@ -83,16 +93,19 @@ class TaskService {
       }
 
       const now = new Date().toISOString();
-      const newTask = {
+      const newTask: any = {
         ...task,
         siteId: currentSite.id,
         createdAt: now,
         updatedAt: now,
-        photos: task.photos || [],
-        videos: task.videos || [],
+        photos: task.photos?.filter(url => this.validateMediaUrl(url)) || [],
+        videos: task.videos?.filter(url => this.validateMediaUrl(url)) || [],
         status: task.status || 'pending',
         priority: task.priority || 'medium',
       };
+      if (!newTask.completedAt) {
+        delete newTask.completedAt;
+      }
 
       console.log('Dados da tarefa a serem salvos:', newTask);
       const docRef = await addDoc(collection(db, 'tasks'), newTask);
@@ -110,10 +123,21 @@ class TaskService {
 
   async updateTask(taskId: string, updates: Partial<Task>): Promise<void> {
     try {
-      await updateDoc(doc(db, 'tasks', taskId), {
+      const updateData: any = {
         ...updates,
+        photos: updates.photos?.filter(url => this.validateMediaUrl(url)) || [],
+        videos: updates.videos?.filter(url => this.validateMediaUrl(url)) || [],
         updatedAt: serverTimestamp(),
+      };
+      
+      // Remover campos undefined
+      Object.keys(updateData).forEach(key => {
+        if (updateData[key] === undefined) {
+          delete updateData[key];
+        }
       });
+      
+      await updateDoc(doc(db, 'tasks', taskId), updateData);
     } catch (error) {
       console.error('Erro ao atualizar tarefa:', error);
       throw error;

@@ -9,7 +9,7 @@ import {
 import { router } from 'expo-router';
 import { ArrowLeft, Users, ClipboardCheck, Clock, AlertCircle } from 'lucide-react-native';
 import { AuthService } from '@/services/AuthService';
-import TaskService from '@/services/TaskService';
+import taskService from '@/services/TaskService';
 
 // Define Task type with status property
 type Task = {
@@ -45,7 +45,7 @@ export default function StatsScreen() {
     try {
       setLoading(true);
       const workers = await AuthService.getInstance().getWorkers();
-      const tasks = await TaskService.getInstance.getTasks();
+      const tasks = await taskService.getTasks();
 
       const completedTasks = tasks.filter((task: Task) => task.status === 'completed');
       const pendingTasks = tasks.filter((task: Task) => task.status === 'pending');
@@ -178,7 +178,8 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: '45%',
     alignItems: 'center',
-    boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.1)',
+    boxShadow: '0px 2px 4px rgba(0,0,0,0.1)',
+    elevation: 3,
   },
   statValue: {
     fontSize: 24,

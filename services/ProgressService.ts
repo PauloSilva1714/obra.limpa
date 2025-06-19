@@ -1,6 +1,8 @@
-import TaskService from './TaskService';
+import { db } from '@/config/firebase';
+import { collection, query, where, getDocs } from 'firebase/firestore';
+import { AuthService } from './AuthService';
 
-interface ProgressData {
+export interface ProgressData {
   totalTasks: number;
   completedTasks: number;
   inProgressTasks: number;
@@ -18,46 +20,74 @@ interface ProgressData {
   }>;
 }
 
-class ProgressManagementService {
+export class ProgressService {
+  private static instance: ProgressService;
+
+  private constructor() {}
+
+  public static getInstance(): ProgressService {
+    if (!ProgressService.instance) {
+      ProgressService.instance = new ProgressService();
+    }
+    return ProgressService.instance;
+  }
+
   async getProgressData(): Promise<ProgressData> {
     try {
-      const tasks = await TaskService.getTasks();
-      
+      const currentSite = await AuthService.getCurrentSite();
+      if (!currentSite) {
+        throw new Error('Nenhuma obra selecionada');
+      }
+
+      const tasksRef = collection(db, 'tasks');
+      const q = query(tasksRef, where('siteId', '==', currentSite.id));
+      const querySnapshot = await getDocs(q);
+
+      const tasks = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+
+      // Calcular estatísticas gerais
       const totalTasks = tasks.length;
       const completedTasks = tasks.filter(task => task.status === 'completed').length;
       const inProgressTasks = tasks.filter(task => task.status === 'in_progress').length;
       const pendingTasks = tasks.filter(task => task.status === 'pending').length;
       const completionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
-      // Generate weekly progress (mock data for demo)
-      const weeklyProgress = [
-        { day: 'Seg', completed: 2 },
-        { day: 'Ter', completed: 1 },
-        { day: 'Qua', completed: 3 },
-        { day: 'Qui', completed: 0 },
-        { day: 'Sex', completed: 1 },
-        { day: 'Sáb', completed: 0 },
-        { day: 'Dom', completed: 0 },
-      ];
+      // Calcular progresso semanal
+      const today = new Date();
+      const weekStart = new Date(today);
+      weekStart.setDate(today.getDate() - today.getDay());
+      
+      const weeklyProgress = Array.from({ length: 7 }, (_, i) => {
+        const date = new Date(weekStart);
+        date.setDate(weekStart.getDate() + i);
+        const dayName = date.toLocaleDateString('pt-BR', { weekday: 'short' });
+        
+        const completed = tasks.filter(task => {
+          const taskDate = new Date(task.updatedAt?.toDate() || task.createdAt?.toDate());
+          return taskDate.toDateString() === date.toDateString() && task.status === 'completed';
+        }).length;
 
-      // Calculate progress by area
-      const areaStats = tasks.reduce((acc, task) => {
-        if (!acc[task.area]) {
-          acc[task.area] = { total: 0, completed: 0 };
-        }
-        acc[task.area].total++;
-        if (task.status === 'completed') {
-          acc[task.area].completed++;
-        }
-        return acc;
-      }, {} as Record<string, { total: number; completed: number }>);
+        return { day: dayName, completed };
+      });
 
-      const areaProgress = Object.entries(areaStats).map(([area, stats]) => ({
-        area,
-        total: stats.total,
-        completed: stats.completed,
-        percentage: Math.round((stats.completed / stats.total) * 100),
-      }));
+      // Calcular progresso por área
+      const areas = [...new Set(tasks.map(task => task.area))];
+      const areaProgress = areas.map(area => {
+        const areaTasks = tasks.filter(task => task.area === area);
+        const total = areaTasks.length;
+        const completed = areaTasks.filter(task => task.status === 'completed').length;
+        const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
+
+        return {
+          area,
+          total,
+          completed,
+          percentage
+        };
+      });
 
       return {
         totalTasks,
@@ -66,22 +96,11 @@ class ProgressManagementService {
         pendingTasks,
         completionRate,
         weeklyProgress,
-        areaProgress,
+        areaProgress
       };
     } catch (error) {
-      console.error('Error loading progress data:', error);
-      // Return default data in case of error
-      return {
-        totalTasks: 0,
-        completedTasks: 0,
-        inProgressTasks: 0,
-        pendingTasks: 0,
-        completionRate: 0,
-        weeklyProgress: [],
-        areaProgress: [],
-      };
+      console.error('Erro ao carregar dados de progresso:', error);
+      throw error;
     }
   }
 }
-
-export const ProgressService = new ProgressManagementService();

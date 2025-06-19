@@ -24,7 +24,7 @@ export default function InviteWorkerScreen() {
 
     setLoading(true);
     try {
-      await AuthService.sendInvite(email.trim());
+      await AuthService.getInstance().sendInvite(email.trim());
       Alert.alert(
         'Sucesso',
         'Convite enviado com sucesso!',

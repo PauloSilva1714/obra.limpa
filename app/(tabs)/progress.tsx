@@ -2,25 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChartBar as BarChart3, TrendingUp, Clock, CircleCheck as CheckCircle } from 'lucide-react-native';
-import { ProgressService } from '@/services/ProgressService';
-
-interface ProgressData {
-  totalTasks: number;
-  completedTasks: number;
-  inProgressTasks: number;
-  pendingTasks: number;
-  completionRate: number;
-  weeklyProgress: Array<{
-    day: string;
-    completed: number;
-  }>;
-  areaProgress: Array<{
-    area: string;
-    total: number;
-    completed: number;
-    percentage: number;
-  }>;
-}
+import { ProgressService, ProgressData } from '@/services/ProgressService';
 
 const screenWidth = Dimensions.get('window').width;
 
@@ -42,10 +24,10 @@ export default function ProgressScreen() {
 
   const loadProgressData = async () => {
     try {
-      const data = await ProgressService.getProgressData();
+      const data = await ProgressService.getInstance().getProgressData();
       setProgressData(data);
     } catch (error) {
-      console.error('Error loading progress data:', error);
+      console.error('Erro ao carregar dados de progresso:', error);
     } finally {
       setLoading(false);
     }
@@ -59,10 +41,10 @@ export default function ProgressScreen() {
       <View style={styles.chartContainer}>
         <Text style={styles.chartTitle}>Progresso Semanal</Text>
         <View style={styles.chart}>
-          {progressData.weeklyProgress.map((item, index) => {
+          {progressData.weeklyProgress.map((item) => {
             const barHeight = (item.completed / maxValue) * chartHeight;
             return (
-              <View key={index} style={styles.chartBar}>
+              <View key={item.day} style={styles.chartBar}>
                 <View style={styles.barContainer}>
                   <View 
                     style={[
@@ -212,7 +194,6 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 16,
-    fontFamily: 'Inter-Regular',
     color: '#6B7280',
   },
   header: {
@@ -227,7 +208,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 24,
-    fontFamily: 'Inter-Bold',
+    fontWeight: '600',
     color: '#111827',
   },
   completionContainer: {
@@ -235,12 +216,11 @@ const styles = StyleSheet.create({
   },
   completionRate: {
     fontSize: 32,
-    fontFamily: 'Inter-Bold',
+    fontWeight: '700',
     color: '#F97316',
   },
   completionLabel: {
     fontSize: 12,
-    fontFamily: 'Inter-Regular',
     color: '#6B7280',
   },
   scrollView: {
@@ -274,12 +254,11 @@ const styles = StyleSheet.create({
   },
   statNumber: {
     fontSize: 24,
-    fontFamily: 'Inter-Bold',
+    fontWeight: '700',
     color: '#111827',
   },
   statLabel: {
     fontSize: 12,
-    fontFamily: 'Inter-Regular',
     color: '#6B7280',
     marginTop: 4,
   },
@@ -293,7 +272,7 @@ const styles = StyleSheet.create({
   },
   chartTitle: {
     fontSize: 18,
-    fontFamily: 'Inter-SemiBold',
+    fontWeight: '600',
     color: '#111827',
     marginBottom: 16,
   },
@@ -320,18 +299,17 @@ const styles = StyleSheet.create({
   },
   chartLabel: {
     fontSize: 12,
-    fontFamily: 'Inter-Regular',
     color: '#6B7280',
     marginBottom: 4,
   },
   chartValue: {
     fontSize: 14,
-    fontFamily: 'Inter-SemiBold',
+    fontWeight: '600',
     color: '#111827',
   },
   sectionTitle: {
     fontSize: 18,
-    fontFamily: 'Inter-SemiBold',
+    fontWeight: '600',
     color: '#111827',
     paddingHorizontal: 20,
     marginBottom: 16,
@@ -355,12 +333,12 @@ const styles = StyleSheet.create({
   },
   areaName: {
     fontSize: 16,
-    fontFamily: 'Inter-SemiBold',
+    fontWeight: '600',
     color: '#111827',
   },
   areaPercentage: {
     fontSize: 14,
-    fontFamily: 'Inter-Bold',
+    fontWeight: '700',
     color: '#F97316',
   },
   areaProgressBar: {
@@ -377,7 +355,6 @@ const styles = StyleSheet.create({
   },
   areaStats: {
     fontSize: 12,
-    fontFamily: 'Inter-Regular',
     color: '#6B7280',
   },
   insightsContainer: {
@@ -394,38 +371,9 @@ const styles = StyleSheet.create({
   },
   insightText: {
     fontSize: 14,
-    fontFamily: 'Inter-Regular',
     color: '#374151',
     marginLeft: 12,
     flex: 1,
     lineHeight: 20,
-  },
-  card: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-  },
-  progressCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-  },
-  chartCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-  },
-  areaCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
   },
 });
