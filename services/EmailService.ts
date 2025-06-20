@@ -1,5 +1,5 @@
 import { getFunctions, httpsCallable } from "firebase/functions";
-import { AuthService } from './AuthService';
+import { User } from './AuthService';
 
 const functions = getFunctions();
 const sendEmailV2 = httpsCallable(functions, 'sendEmailV2');
@@ -40,7 +40,7 @@ export const EmailService = {
    * Confirmação de criação de tarefa
    */
   async sendTaskCreationConfirmation(
-    adminEmail: string,
+    user: User,
     taskData: {
       title: string;
       description: string;
@@ -50,8 +50,7 @@ export const EmailService = {
       priority: string;
     }
   ): Promise<{ success: boolean; error?: string }> {
-    const adminUser = await AuthService.getUserByEmail(adminEmail);
-    if (adminUser?.notifications?.taskCreation === false) {
+    if (user.notifications?.taskCreation === false) {
       return { success: true, error: 'User opted out of this notification.' };
     }
     const dueDateText = taskData.dueDate 
@@ -59,7 +58,7 @@ export const EmailService = {
       : 'Não definida';
 
     return this.sendEmail({
-      to: adminEmail,
+      to: user.email,
       subject: `Tarefa Criada: ${taskData.title}`,
       text: `Tarefa criada com sucesso!\n\nTítulo: ${taskData.title}\nDescrição: ${taskData.description}\nDesignado para: ${taskData.assignedTo}\nData de vencimento: ${dueDateText}\nÁrea: ${taskData.area}\nPrioridade: ${taskData.priority}`,
       html: `
@@ -110,7 +109,7 @@ export const EmailService = {
    * Confirmação de atualização de tarefa
    */
   async sendTaskUpdateConfirmation(
-    adminEmail: string,
+    user: User,
     taskData: {
       title: string;
       status: string;
@@ -118,8 +117,7 @@ export const EmailService = {
       changes: string[];
     }
   ): Promise<{ success: boolean; error?: string }> {
-    const adminUser = await AuthService.getUserByEmail(adminEmail);
-    if (adminUser?.notifications?.taskUpdate === false) {
+    if (user.notifications?.taskUpdate === false) {
       return { success: true, error: 'User opted out of this notification.' };
     }
     const statusText = {
@@ -129,7 +127,7 @@ export const EmailService = {
     }[taskData.status] || taskData.status;
 
     return this.sendEmail({
-      to: adminEmail,
+      to: user.email,
       subject: `Tarefa Atualizada: ${taskData.title}`,
       text: `Tarefa atualizada com sucesso!\n\nTítulo: ${taskData.title}\nStatus: ${statusText}\nAtualizado por: ${taskData.updatedBy}\n\nAlterações:\n${taskData.changes.map(change => `• ${change}`).join('\n')}`,
       html: `
@@ -156,31 +154,28 @@ export const EmailService = {
    * Confirmação de login
    */
   async sendLoginConfirmation(
-    userEmail: string,
-    userData: {
-      name: string;
-      company: string;
+    user: User,
+    loginData: {
       loginTime: string;
       deviceInfo?: string;
     }
   ): Promise<{ success: boolean; error?: string }> {
-    const user = await AuthService.getUserByEmail(userEmail);
-    if (user?.notifications?.loginConfirmation === false) {
+    if (user.notifications?.loginConfirmation === false) {
       return { success: true, error: 'User opted out of this notification.' };
     }
     return this.sendEmail({
-      to: userEmail,
+      to: user.email,
       subject: "Login Confirmado - Obra Limpa",
-      text: `Login realizado com sucesso!\n\nUsuário: ${userData.name}\nEmpresa: ${userData.company}\nHorário: ${userData.loginTime}\n${userData.deviceInfo ? `Dispositivo: ${userData.deviceInfo}` : ''}`,
+      text: `Login realizado com sucesso!\n\nUsuário: ${user.name}\nEmpresa: ${user.company || 'N/A'}\nHorário: ${loginData.loginTime}\n${loginData.deviceInfo ? `Dispositivo: ${loginData.deviceInfo}` : ''}`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <h2 style="color: #16a34a;">🔐 Login Confirmado</h2>
           <div style="background-color: #f0fdf4; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #16a34a;">
             <h3 style="color: #1f2937; margin-top: 0;">Bem-vindo de volta!</h3>
-            <p><strong>Usuário:</strong> ${userData.name}</p>
-            <p><strong>Empresa:</strong> ${userData.company}</p>
-            <p><strong>Horário do login:</strong> ${userData.loginTime}</p>
-            ${userData.deviceInfo ? `<p><strong>Dispositivo:</strong> ${userData.deviceInfo}</p>` : ''}
+            <p><strong>Usuário:</strong> ${user.name}</p>
+            <p><strong>Empresa:</strong> ${user.company || 'Não informada'}</p>
+            <p><strong>Horário do login:</strong> ${loginData.loginTime}</p>
+            ${loginData.deviceInfo ? `<p><strong>Dispositivo:</strong> ${loginData.deviceInfo}</p>` : ''}
           </div>
           <p style="color: #6b7280; font-size: 14px;">
             Se você não realizou este login, entre em contato com o administrador imediatamente.

@@ -18,7 +18,7 @@ import {
   deleteDoc,
   serverTimestamp,
 } from 'firebase/firestore';
-import { auth, db } from '../config/firebase';
+import { auth, db } from '@/config/firebase';
 import { EmailService } from './EmailService';
 
 export interface User {
@@ -164,10 +164,8 @@ export class AuthService {
       // Enviar confirmação de login por email
       try {
         await EmailService.sendLoginConfirmation(
-          userData.email,
+          userData,
           {
-            name: userData.name,
-            company: userData.company || 'Não informada',
             loginTime: new Date().toLocaleString('pt-BR'),
             deviceInfo: 'Web Browser'
           }

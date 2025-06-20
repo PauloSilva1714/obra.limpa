@@ -1,97 +1,182 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
-import { AuthService } from '@/services/AuthService';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { AuthService, User } from '@/services/AuthService';
+import { InviteService } from '@/services/InviteService';
 import { Trash2 } from 'lucide-react-native';
+import { ConfirmationModal } from '@/components/ConfirmationModal';
 
 interface Invite {
   id: string;
   email: string;
   status: 'pending' | 'accepted' | 'rejected';
   siteId: string;
-  createdAt: string;
+  createdAt: any;
 }
 
 export default function InvitesScreen() {
   const [invites, setInvites] = useState<Invite[]>([]);
   const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<User | null>(null);
+  const [isConfirmModalVisible, setConfirmModalVisible] = useState(false);
+  const [inviteToDelete, setInviteToDelete] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchInvites();
+    const loadUserAndInvites = async () => {
+      setLoading(true);
+      const currentUser = await AuthService.getCurrentUser();
+      setUser(currentUser);
+      
+      if (currentUser?.role === 'admin') {
+        try {
+          const data = await InviteService.getPendingInvites();
+          setInvites(data as Invite[]);
+        } catch (error) {
+          console.error('Erro ao carregar convites do admin:', error);
+          Alert.alert('Erro', 'Não foi possível carregar os convites pendentes.');
+        }
+      } else {
+        try {
+          const data = await AuthService.getInvitesForCurrentUser();
+          setInvites(data);
+        } catch (error) {
+          Alert.alert('Erro', 'Não foi possível carregar seus convites.');
+        }
+      }
+      setLoading(false);
+    };
+
+    loadUserAndInvites();
   }, []);
 
   const fetchInvites = async () => {
     setLoading(true);
+    if (user?.role === 'admin') {
+      try {
+        const data = await InviteService.getPendingInvites();
+        setInvites(data as Invite[]);
+      } catch (error) {
+        console.error('Erro ao recarregar convites do admin:', error);
+        Alert.alert('Erro', 'Não foi possível recarregar os convites.');
+      }
+    } else {
+      try {
+        const data = await AuthService.getInvitesForCurrentUser();
+        setInvites(data);
+      } catch (error) {
+        Alert.alert('Erro', 'Não foi possível carregar seus convites.');
+      }
+    }
+    setLoading(false);
+  };
+
+  const handleCancelOrDeleteInvite = (inviteId: string) => {
+    console.log('Botão de excluir/cancelar clicado. ID do convite:', inviteId);
+    setInviteToDelete(inviteId);
+    setConfirmModalVisible(true);
+  };
+
+  const confirmDeletion = async () => {
+    if (!inviteToDelete) return;
+
+    const isUserAdmin = user?.role === 'admin';
+    console.log('Confirmada a exclusão. Usuário é admin?', isUserAdmin);
+
     try {
-      const data = await AuthService.getInstance().getInvites();
-      setInvites(data);
+      if (isUserAdmin) {
+        console.log('Chamando InviteService.deleteInvite com o ID:', inviteToDelete);
+        await InviteService.deleteInvite(inviteToDelete);
+      } else {
+        console.log('Chamando AuthService.cancelInvite com o ID:', inviteToDelete);
+        await AuthService.cancelInvite(inviteToDelete);
+      }
+      console.log('Ação de exclusão/cancelamento concluída. Recarregando convites.');
+      await fetchInvites();
+      Alert.alert('Sucesso', `Convite ${isUserAdmin ? 'excluído' : 'cancelado'} com sucesso`);
     } catch (error) {
-      Alert.alert('Erro', 'Não foi possível carregar os convites.');
+      console.error('Erro ao processar o convite:', error);
+      Alert.alert('Erro', `Não foi possível ${isUserAdmin ? 'excluir' : 'cancelar'} o convite`);
     } finally {
-      setLoading(false);
+      setConfirmModalVisible(false);
+      setInviteToDelete(null);
     }
   };
 
-  const handleCancelInvite = (inviteId: string) => {
-    Alert.alert(
-      'Cancelar convite',
-      'Tem certeza que deseja cancelar este convite?',
-      [
-        { text: 'Não', style: 'cancel' },
-        {
-          text: 'Sim', style: 'destructive', onPress: async () => {
-            try {
-              await AuthService.getInstance().cancelInvite(inviteId);
-              await fetchInvites();
-              Alert.alert('Sucesso', 'Convite cancelado com sucesso');
-            } catch (error) {
-              Alert.alert('Erro', 'Não foi possível cancelar o convite');
-            }
-          }
-        }
-      ]
+  const renderInviteItem = ({ item }: { item: Invite }) => {
+    const isPending = item.status === 'pending';
+    let statusText = 'Cancelado';
+    let statusColor = '#666';
+
+    if (isPending) {
+      statusText = 'Pendente';
+      statusColor = '#FF9800';
+    } else if (item.status === 'accepted') {
+      statusText = 'Aceito';
+      statusColor = '#10B981';
+    }
+    
+    const canTakeAction = isPending;
+
+    return (
+      <View style={styles.card}>
+        <View style={styles.inviteHeader}>
+          <View>
+            <Text style={styles.inviteEmail}>{item.email}</Text>
+            <Text style={styles.inviteDate}>
+              Enviado em: {item.createdAt?.toDate ? item.createdAt.toDate().toLocaleDateString() : 'Data indisponível'}
+            </Text>
+          </View>
+          {canTakeAction && (
+            <TouchableOpacity style={styles.actionButton} onPress={() => handleCancelOrDeleteInvite(item.id)}>
+              <Trash2 size={20} color="#EF4444" />
+            </TouchableOpacity>
+          )}
+        </View>
+        <Text style={[styles.inviteStatus, { color: statusColor }]}>
+          {statusText}
+        </Text>
+      </View>
     );
   };
 
-  const renderInviteItem = ({ item }: { item: Invite }) => (
-    <View style={styles.card}>
-      <View style={styles.inviteHeader}>
-        <View>
-          <Text style={styles.inviteEmail}>{item.email}</Text>
-          <Text style={styles.inviteDate}>
-            Enviado em: {item.createdAt ? new Date(item.createdAt).toLocaleDateString() : '-'}
-          </Text>
-        </View>
-        {item.status === 'pending' && (
-          <TouchableOpacity style={styles.actionButton} onPress={() => handleCancelInvite(item.id)}>
-            <Trash2 size={20} color="#666" />
-          </TouchableOpacity>
-        )}
-      </View>
-      <Text style={[
-        styles.inviteStatus,
-        { color: item.status === 'pending' ? '#FF9800' : item.status === 'accepted' ? '#10B981' : '#666' }
-      ]}>
-        {item.status === 'pending' ? 'Pendente' : item.status === 'accepted' ? 'Aceito' : 'Cancelado'}
-      </Text>
-    </View>
-  );
-
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Convites</Text>
+    <SafeAreaView style={styles.container}>
+      <Text style={styles.title}>
+        {user?.role === 'admin' ? 'Gerenciar Convites' : 'Meus Convites'}
+      </Text>
       {loading ? (
         <ActivityIndicator size="large" color="#F97316" style={{ marginTop: 32 }} />
       ) : invites.length === 0 ? (
-        <Text style={styles.subtitle}>Nenhum convite encontrado.</Text>
+        <Text style={styles.subtitle}>
+          {user?.role === 'admin' ? 'Nenhum convite pendente encontrado.' : 'Você não tem nenhum convite.'}
+        </Text>
       ) : (
         <FlatList
           data={invites}
           renderItem={renderInviteItem}
           keyExtractor={item => item.id}
           contentContainerStyle={styles.list}
+          onRefresh={fetchInvites}
+          refreshing={loading}
         />
       )}
-    </View>
+
+      <ConfirmationModal
+        visible={isConfirmModalVisible}
+        title={user?.role === 'admin' ? 'Excluir convite' : 'Cancelar convite'}
+        message={
+          user?.role === 'admin'
+            ? 'Tem certeza que deseja excluir permanentemente este convite?'
+            : 'Tem certeza que deseja cancelar seu convite?'
+        }
+        onConfirm={confirmDeletion}
+        onCancel={() => {
+          setConfirmModalVisible(false);
+          setInviteToDelete(null);
+        }}
+        confirmText={user?.role === 'admin' ? 'Excluir' : 'Sim'}
+      />
+    </SafeAreaView>
   );
 }
 
@@ -102,10 +187,10 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   title: {
-    fontSize: 24,
-    fontWeight: '600',
+    fontSize: 28,
+    fontWeight: 'bold',
     color: '#111827',
-    marginBottom: 8,
+    marginBottom: 16,
   },
   subtitle: {
     fontSize: 16,
@@ -118,10 +203,11 @@ const styles = StyleSheet.create({
   },
   card: {
     backgroundColor: '#fff',
-    borderRadius: 8,
+    borderRadius: 12,
     padding: 16,
     marginBottom: 12,
-    boxShadow: '0px 2px 4px rgba(0,0,0,0.1)',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
   inviteHeader: {
     flexDirection: 'row',
@@ -132,18 +218,18 @@ const styles = StyleSheet.create({
   inviteEmail: {
     fontSize: 16,
     fontWeight: '500',
+    color: '#1F2937',
     marginBottom: 4,
   },
   inviteDate: {
     fontSize: 12,
-    color: '#666',
+    color: '#6B7280',
   },
   inviteStatus: {
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: '600',
   },
   actionButton: {
     padding: 8,
-    marginLeft: 8,
   },
 }); 

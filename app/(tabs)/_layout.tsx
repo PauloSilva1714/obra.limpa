@@ -70,14 +70,6 @@ export default function TabLayout() {
       />
       
       <Tabs.Screen
-        name="camera"
-        options={{
-          title: 'Câmera',
-          tabBarIcon: ({ color, size }) => <Camera size={size} color={color} />,
-        }}
-      />
-      
-      <Tabs.Screen
         name="invites"
         options={{
           title: 'Convites',

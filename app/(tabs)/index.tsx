@@ -137,7 +137,7 @@ export default function TasksScreen() {
 
         if (changes.length > 0) {
           await EmailService.sendTaskUpdateConfirmation(
-            currentUser.email,
+            currentUser,
             {
               title: taskData.title || selectedTask.title,
               status: taskData.status || selectedTask.status,
@@ -161,7 +161,7 @@ export default function TasksScreen() {
 
         // Enviar confirmação de criação por email
         await EmailService.sendTaskCreationConfirmation(
-          currentUser.email,
+          currentUser,
           {
             title: taskData.title || '',
             description: taskData.description || '',
