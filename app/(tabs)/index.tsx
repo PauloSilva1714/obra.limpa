@@ -23,6 +23,7 @@ import {
 import { Feather } from '@expo/vector-icons';
 import taskService, { Task } from '@/services/TaskService';
 import { AuthService } from '@/services/AuthService';
+import { EmailService } from '@/services/EmailService';
 import { TaskModal } from '@/components/TaskModal';
 
 export default function TasksScreen() {
@@ -96,22 +97,93 @@ export default function TasksScreen() {
 
   const handleTaskSave = async (taskData: Partial<Task>) => {
     try {
+      const currentUser = await AuthService.getCurrentUser();
+      if (!currentUser) {
+        Alert.alert('Erro', 'Usuário não encontrado.');
+        return;
+      }
+
       if (selectedTask) {
+        // Atualizando tarefa existente
         await taskService.updateTask(selectedTask.id, taskData);
+        
+        // Enviar confirmação de atualização por email
+        const changes = [];
+        if (taskData.title && taskData.title !== selectedTask.title) {
+          changes.push(`Título alterado de "${selectedTask.title}" para "${taskData.title}"`);
+        }
+        if (taskData.description && taskData.description !== selectedTask.description) {
+          changes.push('Descrição atualizada');
+        }
+        if (taskData.assignedTo && taskData.assignedTo !== selectedTask.assignedTo) {
+          changes.push(`Designado de "${selectedTask.assignedTo}" para "${taskData.assignedTo}"`);
+        }
+        if (taskData.status && taskData.status !== selectedTask.status) {
+          const statusText = {
+            'pending': 'Pendente',
+            'in_progress': 'Em Andamento',
+            'completed': 'Concluída'
+          }[taskData.status] || taskData.status;
+          changes.push(`Status alterado para "${statusText}"`);
+        }
+        if (taskData.priority && taskData.priority !== selectedTask.priority) {
+          const priorityText = {
+            'high': 'Alta',
+            'medium': 'Média',
+            'low': 'Baixa'
+          }[taskData.priority] || taskData.priority;
+          changes.push(`Prioridade alterada para "${priorityText}"`);
+        }
+
+        if (changes.length > 0) {
+          await EmailService.sendTaskUpdateConfirmation(
+            currentUser.email,
+            {
+              title: taskData.title || selectedTask.title,
+              status: taskData.status || selectedTask.status,
+              updatedBy: currentUser.name,
+              changes
+            }
+          );
+        }
       } else {
+        // Criando nova tarefa
         const currentSite = await AuthService.getCurrentSite();
         if (!currentSite) {
           Alert.alert('Erro', 'Nenhum canteiro selecionado.');
           return;
         }
-        await taskService.createTask({
+        
+        const newTask = await taskService.createTask({
           ...taskData,
           siteId: currentSite.id,
         } as Omit<Task, 'id' | 'createdAt'>);
+
+        // Enviar confirmação de criação por email
+        await EmailService.sendTaskCreationConfirmation(
+          currentUser.email,
+          {
+            title: taskData.title || '',
+            description: taskData.description || '',
+            assignedTo: taskData.assignedTo || '',
+            dueDate: taskData.dueDate,
+            area: taskData.area || '',
+            priority: taskData.priority || 'low'
+          }
+        );
       }
+      
       setModalVisible(false);
       await loadTasks();
+      
+      // Mostrar mensagem de sucesso
+      Alert.alert(
+        'Sucesso', 
+        selectedTask ? 'Tarefa atualizada com sucesso!' : 'Tarefa criada com sucesso!'
+      );
+      
     } catch (error) {
+      console.error('Erro ao salvar tarefa:', error);
       Alert.alert('Erro', 'Erro ao salvar tarefa.');
     }
   };
@@ -137,6 +209,7 @@ export default function TasksScreen() {
       console.log('Confirmada exclusão da tarefa:', taskToDelete);
       await taskService.deleteTask(taskToDelete);
       console.log('Tarefa excluída com sucesso');
+      
       await loadTasks();
       setDeleteModalVisible(false);
       setTaskToDelete(null);
@@ -281,11 +354,15 @@ export default function TasksScreen() {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Tarefas</Text>
-        {userRole === 'admin' && (
-          <TouchableOpacity style={styles.addButton} onPress={handleCreateTask}>
-            <Plus size={24} color="#FFFFFF" />
-          </TouchableOpacity>
-        )}
+        <View style={styles.headerButtons}>
+          {userRole === 'admin' && (
+            <>
+              <TouchableOpacity style={styles.addButton} onPress={handleCreateTask}>
+                <Plus size={24} color="#FFFFFF" />
+              </TouchableOpacity>
+            </>
+          )}
+        </View>
       </View>
 
       <View style={styles.statsContainer}>
@@ -383,6 +460,10 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontFamily: 'Inter-SemiBold',
     color: '#111827',
+  },
+  headerButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   addButton: {
     backgroundColor: '#2563EB',

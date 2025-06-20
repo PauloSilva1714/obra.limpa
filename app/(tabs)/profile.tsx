@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, Switch } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, Switch, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { User, Building2, LogOut, Settings, Bell, Shield, CircleHelp as HelpCircle } from 'lucide-react-native';
-import { AuthService } from '@/services/AuthService';
+import { AuthService, User as UserData } from '@/services/AuthService';
 
 interface UserProfile {
   name: string;
@@ -11,41 +11,55 @@ interface UserProfile {
   role: 'admin' | 'worker';
   siteName: string;
   joinDate: string;
+  notifications: {
+    taskCreation: boolean;
+    taskUpdate: boolean;
+    loginConfirmation: boolean;
+  };
 }
 
 export default function ProfileScreen() {
-  const [profile, setProfile] = useState<UserProfile>({
-    name: '',
-    email: '',
-    role: 'worker',
-    siteName: '',
-    joinDate: '',
-  });
-  const [notifications, setNotifications] = useState(true);
-  const [loading, setLoading] = useState(true);
+  const [userData, setUserData] = useState<UserData | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
-    loadProfile();
+    const fetchUser = async () => {
+      const user = await AuthService.getCurrentUser();
+      setUserData(user);
+    };
+    fetchUser();
   }, []);
 
-  const loadProfile = async () => {
+  const handleNotificationChange = (key: 'taskCreation' | 'taskUpdate' | 'loginConfirmation', value: boolean) => {
+    setUserData(prev => {
+      if (!prev) return null;
+      return {
+        ...prev,
+        notifications: {
+          ...prev.notifications,
+          [key]: value,
+        },
+      };
+    });
+  };
+
+  const handleSaveChanges = async () => {
+    if (!userData) return;
+    setIsSaving(true);
     try {
-      const userProfile = await AuthService.getUserProfile();
-      setProfile(userProfile);
+      await AuthService.updateNotificationSettings(userData.id, userData.notifications || {});
+      Alert.alert('Sucesso', 'Configurações salvas com sucesso!');
     } catch (error) {
-      Alert.alert('Erro', 'Erro ao carregar perfil do usuário.');
+      Alert.alert('Erro', 'Não foi possível salvar as configurações.');
+      console.error('Failed to save notification settings:', error);
     } finally {
-      setLoading(false);
+      setIsSaving(false);
     }
   };
 
   const handleLogout = async () => {
-    try {
-      await AuthService.logout();
-      router.replace('/(auth)/login');
-    } catch (error) {
-      console.error('Erro ao fazer logout:', error);
-    }
+    await AuthService.logout();
+    router.replace('/login');
   };
 
   const handleSwitchSite = () => {
@@ -101,114 +115,122 @@ export default function ProfileScreen() {
     </TouchableOpacity>
   );
 
-  if (loading) {
+  if (!userData) {
     return (
       <SafeAreaView style={styles.container}>
-        <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Carregando perfil...</Text>
-        </View>
+        <Text>Carregando...</Text>
       </SafeAreaView>
     );
   }
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Perfil</Text>
-      </View>
-
-      <View style={styles.profileCard}>
-        <View style={styles.avatarContainer}>
-          <User size={32} color="#F97316" />
-        </View>
-        <View style={styles.profileInfo}>
-          <Text style={styles.profileName}>{profile.name}</Text>
-          <Text style={styles.profileEmail}>{profile.email}</Text>
-          <View style={styles.profileMeta}>
-            <Text style={styles.profileRole}>
-              {profile.role === 'admin' ? 'Administrador' : 'Trabalhador de Campo'}
-            </Text>
-            <Text style={styles.profileSite}>{profile.siteName}</Text>
+      <ScrollView showsVerticalScrollIndicator={false}>
+        <View style={styles.header}>
+          <User size={40} color="#111827" />
+          <View>
+            <Text style={styles.userName}>{userData.name}</Text>
+            <Text style={styles.userEmail}>{userData.email}</Text>
           </View>
         </View>
-      </View>
 
-      <View style={styles.menuContainer}>
-        {profile.role === 'admin' && (
-          <>
-            <MenuSection title="Administração">
-              <MenuItem
-                icon={<Building2 size={20} color="#6B7280" />}
-                title="Gerenciar Obras"
-                subtitle="Criar, editar e visualizar obras"
-                onPress={() => router.push('/admin/sites')}
-              />
-              <MenuItem
-                icon={<User size={20} color="#6B7280" />}
-                title="Gerenciar Trabalhadores"
-                subtitle="Criar convites e gerenciar permissões"
-                onPress={() => router.push('/admin/workers')}
-              />
-              <MenuItem
-                icon={<Shield size={20} color="#6B7280" />}
-                title="Estatísticas"
-                subtitle="Visualizar métricas e relatórios"
-                onPress={() => router.push('/admin/stats')}
-              />
-            </MenuSection>
-          </>
-        )}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Bell size={24} color="#111827" />
+            <Text style={styles.sectionTitle}>Notificações por Email</Text>
+          </View>
+          <View style={styles.settingRow}>
+            <Text style={styles.settingLabel}>Confirmação de Login</Text>
+            <Switch
+              value={userData.notifications?.loginConfirmation ?? true}
+              onValueChange={(value) => handleNotificationChange('loginConfirmation', value)}
+            />
+          </View>
+          <View style={styles.settingRow}>
+            <Text style={styles.settingLabel}>Criação de Tarefas</Text>
+            <Switch
+              value={userData.notifications?.taskCreation ?? true}
+              onValueChange={(value) => handleNotificationChange('taskCreation', value)}
+            />
+          </View>
+          <View style={styles.settingRow}>
+            <Text style={styles.settingLabel}>Atualização de Tarefas</Text>
+            <Switch
+              value={userData.notifications?.taskUpdate ?? true}
+              onValueChange={(value) => handleNotificationChange('taskUpdate', value)}
+            />
+          </View>
+        </View>
 
-        <MenuSection title="Obra">
-          <MenuItem
-            icon={<Building2 size={20} color="#6B7280" />}
-            title="Trocar de Obra"
-            subtitle="Selecionar outra obra ativa"
-            onPress={handleSwitchSite}
-          />
-        </MenuSection>
+        <TouchableOpacity style={styles.saveButton} onPress={handleSaveChanges} disabled={isSaving}>
+          <Text style={styles.saveButtonText}>{isSaving ? 'Salvando...' : 'Salvar Alterações'}</Text>
+        </TouchableOpacity>
 
-        <MenuSection title="Configurações">
-          <MenuItem
-            icon={<Bell size={20} color="#6B7280" />}
-            title="Notificações"
-            subtitle="Receber alertas de novas tarefas"
-            showSwitch
-            switchValue={notifications}
-            onSwitchChange={setNotifications}
-          />
-          <MenuItem
-            icon={<Shield size={20} color="#6B7280" />}
-            title="Privacidade"
-            subtitle="Configurações de privacidade"
-            onPress={() => Alert.alert('Em breve', 'Funcionalidade em desenvolvimento.')}
-          />
-        </MenuSection>
+        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+          <LogOut size={20} color="#dc2626" />
+          <Text style={styles.logoutButtonText}>Sair</Text>
+        </TouchableOpacity>
 
-        <MenuSection title="Suporte">
-          <MenuItem
-            icon={<HelpCircle size={20} color="#6B7280" />}
-            title="Ajuda"
-            subtitle="Central de ajuda e suporte"
-            onPress={() => Alert.alert('Ajuda', 'Entre em contato com o suporte através do email: suporte@gestaoobras.com')}
-          />
-          <MenuItem
-            icon={<Settings size={20} color="#6B7280" />}
-            title="Sobre"
-            subtitle="Versão 1.0.0"
-            onPress={() => Alert.alert('Sobre', 'Gestão de Obras v1.0.0\nSistema de limpeza e organização para construtoras.')}
-          />
-        </MenuSection>
+        <View style={styles.menuContainer}>
+          {userData.role === 'admin' && (
+            <>
+              <MenuSection title="Administração">
+                <MenuItem
+                  icon={<Building2 size={20} color="#6B7280" />}
+                  title="Gerenciar Obras"
+                  subtitle="Criar, editar e visualizar obras"
+                  onPress={() => router.push('/admin/sites')}
+                />
+                <MenuItem
+                  icon={<User size={20} color="#6B7280" />}
+                  title="Gerenciar Trabalhadores"
+                  subtitle="Criar convites e gerenciar permissões"
+                  onPress={() => router.push('/admin/workers')}
+                />
+                <MenuItem
+                  icon={<Shield size={20} color="#6B7280" />}
+                  title="Estatísticas"
+                  subtitle="Visualizar métricas e relatórios"
+                  onPress={() => router.push('/admin/stats')}
+                />
+              </MenuSection>
+            </>
+          )}
 
-        <MenuSection title="Conta">
-          <MenuItem
-            icon={<LogOut size={20} color="#EF4444" />}
-            title="Sair da Conta"
-            subtitle="Encerrar sessão atual"
-            onPress={handleLogout}
-          />
-        </MenuSection>
-      </View>
+          <MenuSection title="Obra">
+            <MenuItem
+              icon={<Building2 size={20} color="#6B7280" />}
+              title="Trocar de Obra"
+              subtitle="Selecionar outra obra ativa"
+              onPress={handleSwitchSite}
+            />
+          </MenuSection>
+
+          <MenuSection title="Configurações">
+            <MenuItem
+              icon={<Shield size={20} color="#6B7280" />}
+              title="Privacidade"
+              subtitle="Configurações de privacidade"
+              onPress={() => Alert.alert('Em breve', 'Funcionalidade em desenvolvimento.')}
+            />
+          </MenuSection>
+
+          <MenuSection title="Suporte">
+            <MenuItem
+              icon={<HelpCircle size={20} color="#6B7280" />}
+              title="Ajuda"
+              subtitle="Central de ajuda e suporte"
+              onPress={() => Alert.alert('Ajuda', 'Entre em contato com o suporte através do email: suporte@gestaoobras.com')}
+            />
+            <MenuItem
+              icon={<Settings size={20} color="#6B7280" />}
+              title="Sobre"
+              subtitle="Versão 1.0.0"
+              onPress={() => Alert.alert('Sobre', 'Gestão de Obras v1.0.0\nSistema de limpeza e organização para construtoras.')}
+            />
+          </MenuSection>
+        </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -216,82 +238,74 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    fontSize: 16,
-    fontFamily: 'Inter-Regular',
-    color: '#6B7280',
+    backgroundColor: '#F9FAFB',
+    paddingHorizontal: 24,
   },
   header: {
-    paddingHorizontal: 24,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 32,
+    gap: 16,
+    paddingTop: 24,
+  },
+  userName: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#111827',
+  },
+  userEmail: {
+    fontSize: 16,
+    color: '#6B7280',
+  },
+  section: {
+    marginBottom: 24,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 16,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#111827',
+  },
+  settingRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     paddingVertical: 16,
-    backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
     borderBottomColor: '#E5E7EB',
   },
-  title: {
-    fontSize: 24,
-    fontFamily: 'Inter-Bold',
-    color: '#111827',
+  settingLabel: {
+    fontSize: 16,
+    color: '#374151',
   },
-  profileCard: {
-    flexDirection: 'row',
+  saveButton: {
+    backgroundColor: '#2563EB',
+    padding: 16,
+    borderRadius: 8,
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    marginHorizontal: 16,
     marginTop: 16,
-    padding: 20,
-    borderRadius: 16,
-    boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
   },
-  avatarContainer: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: '#FEF3F2',
-    justifyContent: 'center',
-    alignItems: 'center',
+  saveButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
-  profileInfo: {
-    flex: 1,
-    marginLeft: 16,
-  },
-  profileName: {
-    fontSize: 18,
-    fontFamily: 'Inter-SemiBold',
-    color: '#111827',
-    marginBottom: 4,
-  },
-  profileEmail: {
-    fontSize: 14,
-    fontFamily: 'Inter-Regular',
-    color: '#6B7280',
-    marginBottom: 8,
-  },
-  profileMeta: {
+  logoutButton: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 32,
+    gap: 8,
   },
-  profileRole: {
-    fontSize: 12,
-    fontFamily: 'Inter-Medium',
-    color: '#F97316',
-    backgroundColor: '#FEF3F2',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
-    marginRight: 8,
-  },
-  profileSite: {
-    fontSize: 12,
-    fontFamily: 'Inter-Regular',
-    color: '#6B7280',
+  logoutButtonText: {
+    color: '#dc2626',
+    fontSize: 16,
+    fontWeight: '600',
   },
   menuContainer: {
     flex: 1,
@@ -300,13 +314,6 @@ const styles = StyleSheet.create({
   },
   menuSection: {
     marginBottom: 24,
-  },
-  sectionTitle: {
-    fontSize: 14,
-    fontFamily: 'Inter-Medium',
-    color: '#6B7280',
-    marginBottom: 8,
-    paddingHorizontal: 4,
   },
   menuItem: {
     flexDirection: 'row',
@@ -344,12 +351,5 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: 'Inter-Regular',
     color: '#6B7280',
-  },
-  card: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
   },
 });

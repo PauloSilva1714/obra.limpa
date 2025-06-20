@@ -19,6 +19,7 @@ import {
   serverTimestamp,
 } from 'firebase/firestore';
 import { auth, db } from '../config/firebase';
+import { EmailService } from './EmailService';
 
 export interface User {
   id: string;
@@ -30,6 +31,11 @@ export interface User {
   company?: string;
   sites?: string[];
   siteId?: string;
+  notifications?: {
+    taskCreation?: boolean;
+    taskUpdate?: boolean;
+    loginConfirmation?: boolean;
+  };
 }
 
 export interface Site {
@@ -154,6 +160,23 @@ export class AuthService {
       const userData = userDoc.data() as User;
       await AsyncStorage.setItem(this.USER_KEY, JSON.stringify(userData));
       console.log('Login bem-sucedido:', userData);
+
+      // Enviar confirmação de login por email
+      try {
+        await EmailService.sendLoginConfirmation(
+          userData.email,
+          {
+            name: userData.name,
+            company: userData.company || 'Não informada',
+            loginTime: new Date().toLocaleString('pt-BR'),
+            deviceInfo: 'Web Browser'
+          }
+        );
+      } catch (emailError) {
+        console.error('Erro ao enviar confirmação de login por email:', emailError);
+        // Não falhar o login se o email não for enviado
+      }
+
       return true;
     } catch (error) {
       console.error('Erro no login:', error);
@@ -665,6 +688,46 @@ export class AuthService {
     } catch (error) {
       console.error('Erro ao excluir obra:', error);
       throw error;
+    }
+  }
+
+  static async updateNotificationSettings(
+    userId: string,
+    settings: {
+      taskCreation?: boolean;
+      taskUpdate?: boolean;
+      loginConfirmation?: boolean;
+    }
+  ): Promise<void> {
+    try {
+      const userRef = doc(db, 'users', userId);
+      await updateDoc(userRef, {
+        notifications: settings,
+      });
+
+      // Update local user data
+      const instance = AuthService.getInstance();
+      if (instance.currentUser && instance.currentUser.id === userId) {
+        instance.currentUser.notifications = settings;
+        await instance.saveUserToStorage(instance.currentUser);
+      }
+    } catch (error) {
+      console.error('Error updating notification settings:', error);
+      throw error;
+    }
+  }
+
+  static async getUserByEmail(email: string): Promise<User | null> {
+    try {
+      const q = query(collection(db, 'users'), where('email', '==', email));
+      const querySnapshot = await getDocs(q);
+      if (querySnapshot.empty) {
+        return null;
+      }
+      return querySnapshot.docs[0].data() as User;
+    } catch (error) {
+      console.error('Error getting user by email:', error);
+      return null;
     }
   }
 }

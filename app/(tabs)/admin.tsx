@@ -20,8 +20,10 @@ import {
   UserPlus,
   FileText,
   Shield,
+  Loader,
 } from 'lucide-react-native';
-import { AuthService } from '@/services/AuthService';
+import { AuthService, User } from '@/services/AuthService';
+import { AdminService } from '@/services/AdminService';
 
 interface AdminStats {
   totalSites: number;
@@ -31,6 +33,7 @@ interface AdminStats {
 }
 
 export default function AdminScreen() {
+  const [user, setUser] = useState<User | null>(null);
   const [stats, setStats] = useState<AdminStats>({
     totalSites: 0,
     totalWorkers: 0,
@@ -38,28 +41,61 @@ export default function AdminScreen() {
     completedTasks: 0,
   });
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    loadAdminStats();
+    const checkUserAndLoadData = async () => {
+      const currentUser = await AuthService.getCurrentUser();
+      setUser(currentUser);
+
+      if (!currentUser || currentUser.role !== 'admin') {
+        setLoading(false);
+        return;
+      }
+      
+      loadAdminStats();
+    };
+
+    checkUserAndLoadData();
   }, []);
 
   const loadAdminStats = async () => {
     try {
       setLoading(true);
-      // Aqui você pode carregar estatísticas reais do sistema
-      // Por enquanto, vou usar dados mockados
-      setStats({
-        totalSites: 3,
-        totalWorkers: 12,
-        totalTasks: 45,
-        completedTasks: 28,
-      });
-    } catch (error) {
-      console.error('Erro ao carregar estatísticas:', error);
+      setError(null);
+      const adminStats = await AdminService.getAdminStats();
+      setStats(adminStats);
+    } catch (err) {
+      setError('Falha ao carregar as estatísticas. Tente novamente mais tarde.');
+      console.error('Erro ao carregar estatísticas:', err);
     } finally {
       setLoading(false);
     }
   };
+
+  if (loading) {
+    return (
+      <SafeAreaView style={[styles.container, styles.center]}>
+        <Loader size={48} color="#F97316" className="animate-spin" />
+        <Text style={styles.loadingText}>Carregando...</Text>
+      </SafeAreaView>
+    );
+  }
+
+  if (!user || user.role !== 'admin') {
+    return (
+      <SafeAreaView style={[styles.container, styles.center]}>
+        <Shield size={48} color="#EF4444" />
+        <Text style={styles.errorTitle}>Acesso Negado</Text>
+        <Text style={styles.errorText}>
+          Você não tem permissão para acessar esta página.
+        </Text>
+        <TouchableOpacity style={styles.primaryButton} onPress={() => router.replace('/(tabs)')}>
+          <Text style={styles.primaryButtonText}>Voltar para o Início</Text>
+        </TouchableOpacity>
+      </SafeAreaView>
+    );
+  }
 
   const AdminCard = ({ 
     title, 
@@ -225,7 +261,7 @@ const styles = StyleSheet.create({
     borderBottomColor: '#E5E7EB',
   },
   title: {
-    fontSize: 24,
+    fontSize: 28,
     fontFamily: 'Inter-Bold',
     color: '#111827',
     marginBottom: 4,
@@ -238,6 +274,7 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     paddingHorizontal: 24,
+    paddingTop: 16,
   },
   statsSection: {
     marginTop: 24,
@@ -249,24 +286,25 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontFamily: 'Inter-SemiBold',
-    color: '#111827',
+    color: '#374151',
     marginBottom: 16,
   },
   statsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 12,
+    justifyContent: 'space-between',
+    marginHorizontal: -8,
   },
   statCard: {
-    flex: 1,
-    minWidth: '45%',
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
+    borderRadius: 16,
     padding: 16,
+    width: '48%',
+    marginBottom: 16,
     flexDirection: 'row',
     alignItems: 'center',
-    boxShadow: '0px 2px 4px rgba(0,0,0,0.1)',
-    elevation: 3,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
   statIcon: {
     width: 40,
@@ -280,24 +318,23 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   statValue: {
-    fontSize: 24,
+    fontSize: 22,
     fontFamily: 'Inter-Bold',
-    marginBottom: 4,
   },
   statTitle: {
-    fontSize: 12,
-    fontFamily: 'Inter-Medium',
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
     color: '#6B7280',
   },
   adminCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
     padding: 20,
-    marginBottom: 12,
     flexDirection: 'row',
     alignItems: 'center',
-    boxShadow: '0px 2px 4px rgba(0,0,0,0.1)',
-    elevation: 3,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
   cardIcon: {
     width: 48,
@@ -314,11 +351,47 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: 'Inter-SemiBold',
     color: '#111827',
-    marginBottom: 4,
+    marginBottom: 2,
   },
   cardSubtitle: {
     fontSize: 14,
     fontFamily: 'Inter-Regular',
     color: '#6B7280',
+  },
+  center: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 18,
+    color: '#6B7280',
+  },
+  errorTitle: {
+    fontSize: 22,
+    fontFamily: 'Inter-Bold',
+    color: '#1F2937',
+    marginTop: 16,
+    textAlign: 'center',
+  },
+  errorText: {
+    fontSize: 16,
+    fontFamily: 'Inter-Regular',
+    color: '#6B7280',
+    textAlign: 'center',
+    marginTop: 8,
+    marginBottom: 24,
+  },
+  primaryButton: {
+    backgroundColor: '#F97316',
+    paddingVertical: 12,
+    paddingHorizontal: 32,
+    borderRadius: 8,
+  },
+  primaryButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontFamily: 'Inter-SemiBold',
   },
 });
