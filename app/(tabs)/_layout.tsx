@@ -10,9 +10,12 @@ import {
 } from 'lucide-react-native';
 import { AuthService } from '@/services/AuthService';
 import { useState, useEffect } from 'react';
+import { useTheme } from '@/contexts/ThemeContext';
+import { t } from '@/config/i18n';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
+  const { colors, isDarkMode } = useTheme();
   const [userRole, setUserRole] = useState<'admin' | 'worker' | null>(null);
 
   useEffect(() => {
@@ -30,12 +33,12 @@ export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: '#F97316',
-        tabBarInactiveTintColor: '#6B7280',
+        tabBarActiveTintColor: colors.primary,
+        tabBarInactiveTintColor: colors.textMuted,
         tabBarStyle: {
-          backgroundColor: '#FFFFFF',
+          backgroundColor: colors.surface,
           borderTopWidth: 1,
-          borderTopColor: '#E5E7EB',
+          borderTopColor: colors.border,
           paddingBottom: 5,
           paddingTop: 5,
           height: 60,
@@ -46,7 +49,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Tarefas',
+          title: t('tasks'),
           tabBarIcon: ({ color, size }) => <Home size={size} color={color} />,
         }}
       />
@@ -55,7 +58,7 @@ export default function TabLayout() {
         <Tabs.Screen
           name="admin"
           options={{
-            title: 'Admin',
+            title: t('admin'),
             tabBarIcon: ({ color, size }) => <Building2 size={size} color={color} />,
           }}
         />
@@ -64,7 +67,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="progress"
         options={{
-          title: 'Progresso',
+          title: t('progress'),
           tabBarIcon: ({ color, size }) => <BarChart3 size={size} color={color} />,
         }}
       />
@@ -72,7 +75,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="invites"
         options={{
-          title: 'Convites',
+          title: t('invites'),
           tabBarIcon: ({ color, size }) => <Users size={size} color={color} />,
         }}
       />
@@ -80,7 +83,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="profile"
         options={{
-          title: 'Perfil',
+          title: t('profile'),
           tabBarIcon: ({ color, size }) => <User size={size} color={color} />,
         }}
       />

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Dimensions, TouchableOpacity, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ChartBar as BarChart3, TrendingUp, Clock, CircleCheck as CheckCircle } from 'lucide-react-native';
+import { ChartBar as BarChart3, TrendingUp, Clock, CircleCheck as CheckCircle, RefreshCw } from 'lucide-react-native';
 import { ProgressService, ProgressData } from '@/services/ProgressService';
 
 const screenWidth = Dimensions.get('window').width;
@@ -17,6 +17,7 @@ export default function ProgressScreen() {
     areaProgress: [],
   });
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     loadProgressData();
@@ -24,13 +25,102 @@ export default function ProgressScreen() {
 
   const loadProgressData = async () => {
     try {
+      console.log('[ProgressScreen] Carregando dados de progresso...');
       const data = await ProgressService.getInstance().getProgressData();
+      console.log('[ProgressScreen] Dados carregados:', data);
       setProgressData(data);
     } catch (error) {
-      console.error('Erro ao carregar dados de progresso:', error);
+      console.error('[ProgressScreen] Erro ao carregar dados de progresso:', error);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
+  };
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    loadProgressData();
+  };
+
+  const renderPieChart = () => {
+    const chartData = [
+      {
+        name: 'Concluídas',
+        population: progressData.completedTasks,
+        color: '#10B981',
+      },
+      {
+        name: 'Em Andamento',
+        population: progressData.inProgressTasks,
+        color: '#F59E0B',
+      },
+      {
+        name: 'Pendentes',
+        population: progressData.pendingTasks,
+        color: '#EF4444',
+      },
+    ].filter(item => item.population > 0); // Filtrar apenas itens com dados
+
+    if (chartData.length === 0) {
+      return (
+        <View style={styles.pieChartContainer}>
+          <Text style={styles.chartTitle}>Distribuição das Tarefas</Text>
+          <View style={styles.emptyChartContainer}>
+            <Text style={styles.emptyChartText}>Nenhuma tarefa encontrada</Text>
+          </View>
+        </View>
+      );
+    }
+
+    const total = chartData.reduce((sum, item) => sum + item.population, 0);
+
+    return (
+      <View style={styles.pieChartContainer}>
+        <Text style={styles.chartTitle}>Distribuição das Tarefas</Text>
+        
+        {/* Gráfico de pizza simples usando círculos coloridos lado a lado */}
+        <View style={styles.pieChartWrapper}>
+          <View style={styles.pieChart}>
+            {chartData.map((item, index) => {
+              const percentage = (item.population / total) * 100;
+              
+              return (
+                <View key={index} style={styles.pieSliceContainer}>
+                  <View
+                    style={[
+                      styles.pieSlice,
+                      {
+                        backgroundColor: item.color,
+                        flex: item.population,
+                      }
+                    ]}
+                  />
+                </View>
+              );
+            })}
+          </View>
+          
+          {/* Informações centrais */}
+          <View style={styles.pieChartCenter}>
+            <Text style={styles.pieChartTotal}>{total}</Text>
+            <Text style={styles.pieChartLabel}>Total</Text>
+          </View>
+        </View>
+
+        {/* Legenda */}
+        <View style={styles.legendContainer}>
+          {chartData.map((item, index) => (
+            <View key={index} style={styles.legendItem}>
+              <View style={[styles.legendColor, { backgroundColor: item.color }]} />
+              <View style={styles.legendTextContainer}>
+                <Text style={styles.legendText}>{item.name}</Text>
+                <Text style={styles.legendValue}>{item.population} tarefas</Text>
+              </View>
+            </View>
+          ))}
+        </View>
+      </View>
+    );
   };
 
   const renderWeeklyChart = () => {
@@ -106,17 +196,32 @@ export default function ProgressScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Progresso da Obra</Text>
-        <View style={styles.completionContainer}>
-          <Text style={styles.completionRate}>{progressData.completionRate}%</Text>
-          <Text style={styles.completionLabel}>Concluído</Text>
+        <View style={styles.headerContent}>
+          <Text style={styles.title}>Progresso da Obra</Text>
+          <View style={styles.completionContainer}>
+            <Text style={styles.completionRate}>{progressData.completionRate}%</Text>
+            <Text style={styles.completionLabel}>Concluído</Text>
+          </View>
         </View>
+        <TouchableOpacity
+          style={styles.refreshButton}
+          onPress={onRefresh}
+          disabled={refreshing}
+        >
+          <RefreshCw size={20} color="#6B7280" style={refreshing ? { opacity: 0.5 } : undefined} />
+        </TouchableOpacity>
       </View>
 
       <ScrollView 
         style={styles.scrollView} 
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+          />
+        }
       >
         <View style={styles.statsGrid}>
           <View style={styles.statCard}>
@@ -137,13 +242,22 @@ export default function ProgressScreen() {
           
           <View style={styles.statCard}>
             <View style={styles.statIconContainer}>
-              <BarChart3 size={24} color="#F97316" />
+              <BarChart3 size={24} color="#EF4444" />
+            </View>
+            <Text style={styles.statNumber}>{progressData.pendingTasks}</Text>
+            <Text style={styles.statLabel}>Pendentes</Text>
+          </View>
+          
+          <View style={styles.statCard}>
+            <View style={styles.statIconContainer}>
+              <TrendingUp size={24} color="#F97316" />
             </View>
             <Text style={styles.statNumber}>{progressData.totalTasks}</Text>
             <Text style={styles.statLabel}>Total</Text>
           </View>
         </View>
 
+        {renderPieChart()}
         {renderWeeklyChart()}
         {renderAreaProgress()}
 
@@ -206,6 +320,10 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#E5E7EB',
   },
+  headerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   title: {
     fontSize: 24,
     fontWeight: '600',
@@ -233,42 +351,42 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     paddingHorizontal: 16,
     paddingVertical: 16,
+    flexWrap: 'wrap',
   },
   statCard: {
-    flex: 1,
+    width: '48%',
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
-    padding: 20,
-    marginHorizontal: 4,
+    padding: 16,
+    marginHorizontal: '1%',
+    marginBottom: 8,
     alignItems: 'center',
     boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+    elevation: 4,
   },
   statIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: '#F8F9FA',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 8,
   },
   statNumber: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: '700',
     color: '#111827',
   },
   statLabel: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#6B7280',
-    marginTop: 4,
+    marginTop: 2,
+    textAlign: 'center',
   },
   chartContainer: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 20,
-    marginHorizontal: 16,
-    marginBottom: 16,
-    boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+    marginVertical: 20,
+    paddingHorizontal: 20,
   },
   chartTitle: {
     fontSize: 18,
@@ -375,5 +493,109 @@ const styles = StyleSheet.create({
     marginLeft: 12,
     flex: 1,
     lineHeight: 20,
+  },
+  refreshButton: {
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: '#FFFFFF',
+    marginLeft: 16,
+  },
+  pieChartContainer: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 20,
+    marginHorizontal: 16,
+    marginBottom: 16,
+    boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+    elevation: 4,
+  },
+  emptyChartContainer: {
+    height: 200,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  emptyChartText: {
+    fontSize: 14,
+    color: '#6B7280',
+  },
+  pieChartWrapper: {
+    alignItems: 'center',
+    marginVertical: 20,
+    position: 'relative',
+  },
+  pieChart: {
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+    overflow: 'hidden',
+    flexDirection: 'row',
+  },
+  pieSliceContainer: {
+    flex: 1,
+  },
+  pieSlice: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#FFFFFF',
+  },
+  pieChartCenter: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    transform: [{ translateX: -30 }, { translateY: -20 }],
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 40,
+    width: 60,
+    height: 40,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  pieChartTotal: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#111827',
+  },
+  pieChartLabel: {
+    fontSize: 10,
+    color: '#6B7280',
+  },
+  legendContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    flexWrap: 'wrap',
+    paddingHorizontal: 20,
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 8,
+    minWidth: 120,
+  },
+  legendColor: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    marginRight: 8,
+  },
+  legendTextContainer: {
+    flex: 1,
+  },
+  legendText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#374151',
+  },
+  legendValue: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginTop: 2,
   },
 });

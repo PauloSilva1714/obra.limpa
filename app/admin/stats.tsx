@@ -92,7 +92,7 @@ export default function StatsScreen() {
         </View>
       ) : (
         <View style={styles.content}>
-          <Text style={styles.sectionTitle}>Trabalhadores</Text>
+          <Text style={styles.sectionTitle}>Colaboradores</Text>
           <View style={styles.statsGrid}>
             <StatCard
               icon={Users}

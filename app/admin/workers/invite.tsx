@@ -18,7 +18,7 @@ export default function InviteWorkerScreen() {
 
   const handleInvite = async () => {
     if (!email.trim()) {
-      Alert.alert('Erro', 'Por favor, informe o e-mail do trabalhador.');
+      Alert.alert('Erro', 'Por favor, informe o e-mail do colaborador.');
       return;
     }
 
@@ -56,13 +56,15 @@ export default function InviteWorkerScreen() {
         >
           <ArrowLeft size={24} color="#000" />
         </TouchableOpacity>
-        <Text style={styles.title}>Convidar Trabalhador</Text>
-        <View style={styles.placeholder} />
+        <Text style={styles.title}>Convidar Colaborador</Text>
+        <Text style={styles.subtitle}>
+          Envie um convite para um novo colaborador
+        </Text>
       </View>
 
       <View style={styles.form}>
         <View style={styles.inputGroup}>
-          <Text style={styles.label}>E-mail do Trabalhador</Text>
+          <Text style={styles.label}>E-mail do Colaborador</Text>
           <View style={styles.inputContainer}>
             <Mail size={20} color="#666666" style={styles.inputIcon} />
             <TextInput
@@ -112,8 +114,9 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
   },
-  placeholder: {
-    width: 40,
+  subtitle: {
+    fontSize: 16,
+    color: '#666',
   },
   form: {
     padding: 16,

@@ -1,3 +1,7 @@
+import '@/config/console';
+import '@/config/react-native-web';
+import '@/config/expo-router';
+import '@/config/firebase-web';
 import { useEffect, useState } from 'react';
 import { Stack, Slot } from 'expo-router';
 import Head from 'expo-router/head';
@@ -11,12 +15,19 @@ import {
   Inter_700Bold,
 } from '@expo-google-fonts/inter';
 import * as SplashScreen from 'expo-splash-screen';
+import { ThemeProvider } from '@/contexts/ThemeContext';
+import { loadSavedLanguage } from '@/config/i18n';
+import { AuthProvider } from '@/contexts/AuthContext';
+import { SiteProvider } from '@/contexts/SiteContext';
+import { setupGlobalErrorHandler } from '@/config/error-handler';
+import { ConnectionStatus } from '@/components/ConnectionStatus';
 
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   useFrameworkReady();
   const [isLoading, setIsLoading] = useState(true);
+  const [isConnected, setIsConnected] = useState(true);
 
   const [fontsLoaded, fontError] = useFonts({
     'Inter-Regular': Inter_400Regular,
@@ -26,9 +37,21 @@ export default function RootLayout() {
   });
 
   useEffect(() => {
+    const initializeApp = async () => {
+      try {
+        // Carregar idioma salvo de forma segura
+        await loadSavedLanguage();
+      } catch (error) {
+        console.log('Erro ao inicializar app:', error);
+        // Continuar mesmo com erro
+      }
+    };
+
     if (fontsLoaded || fontError) {
-      SplashScreen.hideAsync();
-      setIsLoading(false);
+      initializeApp().finally(() => {
+        SplashScreen.hideAsync();
+        setIsLoading(false);
+      });
     }
   }, [fontsLoaded, fontError]);
 
@@ -40,36 +63,51 @@ export default function RootLayout() {
     document.head.appendChild(link);
   }, []);
 
+  useEffect(() => {
+    // Configurar handler global de erros
+    setupGlobalErrorHandler();
+  }, []);
+
   if (isLoading) {
     return null;
   }
 
   return (
-    <>
-      <Head>
-        <title>Obra Limpa</title>
-        <meta
-          name="description"
-          content="Sistema de gerenciamento de obras e tarefas"
-        />
-        <meta
-          name="viewport"
-          content="width=device-width, initial-scale=1, maximum-scale=1"
-        />
-        <meta name="theme-color" content="#ffffff" />
-        <link rel="icon" href="/favicon.ico" />
-        <link rel="apple-touch-icon" href="/icon.png" />
-        <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-      </Head>
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="index" />
-        <Stack.Screen name="(auth)/login" />
-        <Stack.Screen name="(auth)/site-selection" />
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="+not-found" />
-      </Stack>
-      <StatusBar style="auto" />
-    </>
+    <ThemeProvider>
+      <AuthProvider>
+        <SiteProvider>
+          <Head>
+            <title>Obra Limpa</title>
+            <meta
+              name="description"
+              content="Sistema de gerenciamento de obras e tarefas"
+            />
+            <meta
+              name="viewport"
+              content="width=device-width, initial-scale=1, maximum-scale=1"
+            />
+            <meta name="theme-color" content="#ffffff" />
+            <link rel="icon" href="/favicon.ico" />
+            <link rel="apple-touch-icon" href="/icon.png" />
+            <meta name="apple-mobile-web-app-capable" content="yes" />
+            <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+          </Head>
+          
+          {/* Status de conexão - apenas em desenvolvimento */}
+          {__DEV__ && (
+            <ConnectionStatus onConnectionChange={setIsConnected} />
+          )}
+          
+          <Stack screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="index" />
+            <Stack.Screen name="(auth)/login" />
+            <Stack.Screen name="(auth)/site-selection" />
+            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+            <Stack.Screen name="+not-found" />
+          </Stack>
+          <StatusBar style="auto" />
+        </SiteProvider>
+      </AuthProvider>
+    </ThemeProvider>
   );
 }

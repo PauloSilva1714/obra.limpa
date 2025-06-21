@@ -30,6 +30,19 @@ export default function ProfileScreen() {
     fetchUser();
   }, []);
 
+  // Função para extrair o primeiro nome
+  const getFirstName = (fullName: string) => {
+    return fullName.split(' ')[0];
+  };
+
+  // Função para gerar saudação baseada na hora do dia
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Bom dia';
+    if (hour < 18) return 'Boa tarde';
+    return 'Boa noite';
+  };
+
   const handleNotificationChange = (key: 'taskCreation' | 'taskUpdate' | 'loginConfirmation', value: boolean) => {
     setUserData(prev => {
       if (!prev) return null;
@@ -129,8 +142,7 @@ export default function ProfileScreen() {
         <View style={styles.header}>
           <User size={40} color="#111827" />
           <View>
-            <Text style={styles.userName}>{userData.name}</Text>
-            <Text style={styles.userEmail}>{userData.email}</Text>
+            <Text style={styles.userName}>{getGreeting()} {getFirstName(userData.name)}</Text>
           </View>
         </View>
 
@@ -183,7 +195,7 @@ export default function ProfileScreen() {
                 />
                 <MenuItem
                   icon={<User size={20} color="#6B7280" />}
-                  title="Gerenciar Trabalhadores"
+                  title="Gerenciar Colaboradores"
                   subtitle="Criar convites e gerenciar permissões"
                   onPress={() => router.push('/admin/workers')}
                 />
@@ -247,15 +259,15 @@ const styles = StyleSheet.create({
     marginBottom: 32,
     gap: 16,
     paddingTop: 24,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
   },
   userName: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: 'bold',
     color: '#111827',
-  },
-  userEmail: {
-    fontSize: 16,
-    color: '#6B7280',
+    fontFamily: 'Inter-Bold',
   },
   section: {
     marginBottom: 24,

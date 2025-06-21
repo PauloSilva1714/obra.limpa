@@ -37,7 +37,7 @@ export default function RegisterScreen() {
 
     if (role === 'worker') {
       if (!formData.inviteCode.trim()) {
-        Alert.alert('Erro', 'Código de convite é obrigatório para trabalhadores.');
+        Alert.alert('Erro', 'Código de convite é obrigatório para colaboradores.');
         return;
       }
 
@@ -93,8 +93,8 @@ export default function RegisterScreen() {
       if (error instanceof Error) {
         if (error.message === 'Email já está em uso') {
           Alert.alert('Erro', 'Este e-mail já está cadastrado.');
-        } else if (error.message === 'Convite necessário para cadastro de trabalhador') {
-          Alert.alert('Erro', 'É necessário um convite válido para se cadastrar como trabalhador.');
+        } else if (error.message === 'Convite necessário para cadastro de colaborador') {
+          Alert.alert('Erro', 'É necessário um convite válido para se cadastrar como colaborador.');
         } else if (error.message === 'Convite inválido ou expirado') {
           Alert.alert('Erro', 'O convite informado é inválido ou expirou.');
         } else {
@@ -125,7 +125,7 @@ export default function RegisterScreen() {
             <View style={styles.logoContainer}>
               <Building2 size={48} color="#FFFFFF" strokeWidth={2} />
             </View>
-            <Text style={styles.title}>Cadastro de {role === 'admin' ? 'Administrador' : 'Trabalhador'}</Text>
+            <Text style={styles.title}>Cadastro de {role === 'admin' ? 'Administrador' : 'Colaborador'}</Text>
           </View>
 
           <View style={styles.form}>

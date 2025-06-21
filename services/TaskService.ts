@@ -57,10 +57,13 @@ class TaskService {
 
   async getTasks(): Promise<Task[]> {
     try {
+      console.log('[TaskService] Iniciando busca de tarefas...');
       const currentSite = await AuthService.getCurrentSite();
       if (!currentSite) {
         throw new Error('Nenhuma obra selecionada');
       }
+
+      console.log('[TaskService] Site atual para busca:', currentSite.id);
 
       const tasksQuery = query(
         collection(db, 'tasks'),
@@ -68,15 +71,30 @@ class TaskService {
         orderBy('createdAt', 'desc')
       );
       const snapshot = await getDocs(tasksQuery);
-      return snapshot.docs.map(
-        (doc) =>
-          ({
+      
+      console.log('[TaskService] Total de tarefas encontradas:', snapshot.size);
+      
+      const tasks = snapshot.docs.map(
+        (doc, index) => {
+          const taskData = doc.data();
+          console.log(`[TaskService] Tarefa ${index + 1}:`, {
             id: doc.id,
-            ...doc.data(),
-          } as Task)
+            title: taskData.title,
+            siteId: taskData.siteId,
+            status: taskData.status,
+            createdAt: taskData.createdAt
+          });
+          return {
+            id: doc.id,
+            ...taskData,
+          } as Task;
+        }
       );
+      
+      console.log('[TaskService] Lista final de tarefas:', tasks.map(t => ({ id: t.id, title: t.title })));
+      return tasks;
     } catch (error) {
-      console.error('Erro ao obter tarefas:', error);
+      console.error('[TaskService] Erro ao obter tarefas:', error);
       throw error;
     }
   }
@@ -85,12 +103,14 @@ class TaskService {
     task: Omit<Task, 'id' | 'createdAt' | 'updatedAt'>
   ): Promise<Task> {
     try {
-      console.log('Criando nova tarefa:', task);
+      console.log('[TaskService] Iniciando criação de nova tarefa:', task);
       
       const currentSite = await AuthService.getCurrentSite();
       if (!currentSite) {
         throw new Error('Nenhuma obra selecionada');
       }
+
+      console.log('[TaskService] Site atual:', currentSite.id);
 
       const now = new Date().toISOString();
       const newTask: any = {
@@ -107,16 +127,20 @@ class TaskService {
         delete newTask.completedAt;
       }
 
-      console.log('Dados da tarefa a serem salvos:', newTask);
+      console.log('[TaskService] Dados da tarefa a serem salvos:', newTask);
       const docRef = await addDoc(collection(db, 'tasks'), newTask);
-      console.log('Tarefa criada com ID:', docRef.id);
+      console.log('[TaskService] Tarefa criada com ID:', docRef.id);
+
+      // Verificar se a tarefa foi realmente criada
+      const createdTask = await this.getTaskById(docRef.id);
+      console.log('[TaskService] Tarefa criada confirmada:', createdTask);
 
       return {
         id: docRef.id,
         ...newTask,
       };
     } catch (error) {
-      console.error('Erro ao criar tarefa:', error);
+      console.error('[TaskService] Erro ao criar tarefa:', error);
       throw error;
     }
   }
@@ -235,7 +259,7 @@ class TaskService {
           } as Task)
       );
     } catch (error) {
-      console.error('Erro ao obter tarefas por trabalhador:', error);
+      console.error('Erro ao obter tarefas da obra por colaborador:', error);
       throw error;
     }
   }
@@ -333,7 +357,7 @@ class TaskService {
           } as Task)
       );
     } catch (error) {
-      console.error('Erro ao obter tarefas da obra por trabalhador:', error);
+      console.error('Erro ao obter tarefas da obra por colaborador:', error);
       throw error;
     }
   }

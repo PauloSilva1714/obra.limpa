@@ -19,14 +19,18 @@ import {
   Calendar,
   Trash2,
   X,
+  Eye,
 } from 'lucide-react-native';
 import { Feather } from '@expo/vector-icons';
 import taskService, { Task } from '@/services/TaskService';
 import { AuthService } from '@/services/AuthService';
 import { EmailService } from '@/services/EmailService';
 import { TaskModal } from '@/components/TaskModal';
+import { useTheme } from '@/contexts/ThemeContext';
+import { t } from '@/config/i18n';
 
 export default function TasksScreen() {
+  const { colors } = useTheme();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -66,7 +70,7 @@ export default function TasksScreen() {
       setTasks(siteTasks);
     } catch (error) {
       console.error('Erro ao carregar tarefas:', error);
-      Alert.alert('Erro', 'Erro ao carregar tarefas.');
+      Alert.alert(t('error'), 'Erro ao carregar tarefas.');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -99,7 +103,7 @@ export default function TasksScreen() {
     try {
       const currentUser = await AuthService.getCurrentUser();
       if (!currentUser) {
-        Alert.alert('Erro', 'Usuário não encontrado.');
+        Alert.alert(t('error'), 'Usuário não encontrado.');
         return;
       }
 
@@ -120,17 +124,17 @@ export default function TasksScreen() {
         }
         if (taskData.status && taskData.status !== selectedTask.status) {
           const statusText = {
-            'pending': 'Pendente',
-            'in_progress': 'Em Andamento',
-            'completed': 'Concluída'
+            'pending': t('pending'),
+            'in_progress': t('inProgress'),
+            'completed': t('completed')
           }[taskData.status] || taskData.status;
           changes.push(`Status alterado para "${statusText}"`);
         }
         if (taskData.priority && taskData.priority !== selectedTask.priority) {
           const priorityText = {
-            'high': 'Alta',
-            'medium': 'Média',
-            'low': 'Baixa'
+            'high': t('high'),
+            'medium': t('medium'),
+            'low': t('low')
           }[taskData.priority] || taskData.priority;
           changes.push(`Prioridade alterada para "${priorityText}"`);
         }
@@ -150,7 +154,7 @@ export default function TasksScreen() {
         // Criando nova tarefa
         const currentSite = await AuthService.getCurrentSite();
         if (!currentSite) {
-          Alert.alert('Erro', 'Nenhum canteiro selecionado.');
+          Alert.alert(t('error'), 'Nenhum canteiro selecionado.');
           return;
         }
         
@@ -178,13 +182,13 @@ export default function TasksScreen() {
       
       // Mostrar mensagem de sucesso
       Alert.alert(
-        'Sucesso', 
+        t('success'), 
         selectedTask ? 'Tarefa atualizada com sucesso!' : 'Tarefa criada com sucesso!'
       );
       
     } catch (error) {
       console.error('Erro ao salvar tarefa:', error);
-      Alert.alert('Erro', 'Erro ao salvar tarefa.');
+      Alert.alert(t('error'), 'Erro ao salvar tarefa.');
     }
   };
 
@@ -196,7 +200,7 @@ export default function TasksScreen() {
     } catch (error) {
       console.error('Erro ao excluir tarefa:', error);
       Alert.alert(
-        'Erro',
+        t('error'),
         'Erro ao excluir tarefa. Por favor, tente novamente.'
       );
     }
@@ -206,20 +210,14 @@ export default function TasksScreen() {
     if (!taskToDelete) return;
 
     try {
-      console.log('Confirmada exclusão da tarefa:', taskToDelete);
       await taskService.deleteTask(taskToDelete);
-      console.log('Tarefa excluída com sucesso');
-      
-      await loadTasks();
       setDeleteModalVisible(false);
       setTaskToDelete(null);
-      Alert.alert('Sucesso', 'Tarefa excluída com sucesso.');
+      await loadTasks();
+      Alert.alert(t('success'), 'Tarefa excluída com sucesso!');
     } catch (error) {
-      console.error('Erro ao excluir tarefa:', error);
-      Alert.alert(
-        'Erro',
-        'Erro ao excluir tarefa. Por favor, tente novamente.'
-      );
+      console.error('Erro ao confirmar exclusão:', error);
+      Alert.alert(t('error'), 'Erro ao excluir tarefa.');
     }
   };
 
@@ -231,166 +229,180 @@ export default function TasksScreen() {
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'completed':
-        return <CheckCircle size={20} color="#10B981" />;
+        return <CheckCircle size={16} color={colors.success} />;
       case 'in_progress':
-        return <Clock size={20} color="#F59E0B" />;
+        return <Clock size={16} color={colors.warning} />;
       default:
-        return <AlertCircle size={20} color="#EF4444" />;
+        return <AlertCircle size={16} color={colors.error} />;
     }
   };
 
   const getStatusText = (status: string) => {
     switch (status) {
       case 'completed':
-        return 'Concluída';
+        return t('completed');
       case 'in_progress':
-        return 'Em Andamento';
+        return t('inProgress');
       default:
-        return 'Pendente';
+        return t('pending');
     }
   };
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
       case 'high':
-        return '#EF4444';
+        return colors.priorityHigh;
       case 'medium':
-        return '#F59E0B';
+        return colors.priorityMedium;
       default:
-        return '#10B981';
+        return colors.priorityLow;
     }
   };
 
   const renderTaskItem = ({ item }: { item: Task }) => (
-    <View style={styles.taskCard}>
+    <View style={styles.taskItemContainer}>
       <TouchableOpacity
-        style={{ flex: 1 }}
+        style={[styles.taskItem, { backgroundColor: colors.surface, borderColor: colors.border }]}
         onPress={() => handleTaskPress(item)}
+        onLongPress={() => handleTaskDetails(item)}
       >
         <View style={styles.taskHeader}>
           <View style={styles.taskTitleContainer}>
-            <Text style={styles.taskTitle}>{item.title}</Text>
-            <View
-              style={[
-                styles.priorityDot,
-                { backgroundColor: getPriorityColor(item.priority) },
-              ]}
-            />
-          </View>
-          <View style={styles.taskActions}>
-            <View style={styles.statusContainer}>
+            <Text style={[styles.taskTitle, { color: colors.text }]} numberOfLines={1}>
+              {item.title}
+            </Text>
+            <View style={styles.taskStatus}>
               {getStatusIcon(item.status)}
-              <Text style={styles.statusText}>{getStatusText(item.status)}</Text>
+              <Text style={[styles.statusText, { color: colors.textSecondary }]}>
+                {getStatusText(item.status)}
+              </Text>
+            </View>
+          </View>
+          <View style={styles.taskHeaderActions}>
+            <View style={[styles.priorityBadge, { backgroundColor: getPriorityColor(item.priority) + '20' }]}>
+              <Text style={[styles.priorityText, { color: getPriorityColor(item.priority) }]}>
+                {item.priority === 'high' ? t('high') : item.priority === 'medium' ? t('medium') : t('low')}
+              </Text>
             </View>
             {userRole === 'admin' && (
               <TouchableOpacity
-                onPress={(e) => {
-                  e.stopPropagation();
-                  handleDeleteTask(item.id);
-                }}
-                style={styles.deleteIconButton}
+                style={[styles.deleteButton, { backgroundColor: colors.error + '20' }]}
+                onPress={() => handleDeleteTask(item.id)}
               >
-                <Trash2 size={20} color="#EF4444" />
+                <Trash2 size={14} color={colors.error} />
               </TouchableOpacity>
             )}
           </View>
         </View>
 
-        <Text style={styles.taskDescription} numberOfLines={2}>
-          {item.description}
-        </Text>
+        {item.description && (
+          <Text style={[styles.taskDescription, { color: colors.textSecondary }]} numberOfLines={2}>
+            {item.description}
+          </Text>
+        )}
 
-        <View style={styles.taskMeta}>
-          <View style={styles.metaItem}>
-            <User size={14} color="#6B7280" />
-            <Text style={styles.metaText}>{item.assignedTo}</Text>
-          </View>
-          <View style={styles.metaItem}>
-            <Calendar size={14} color="#6B7280" />
-            <Text style={styles.metaText}>
-              {item.dueDate
-                ? new Date(item.dueDate).toLocaleDateString('pt-BR')
-                : 'Sem data'}
-            </Text>
-          </View>
-          {item.status === 'completed' && item.completedAt && (
-            <View style={styles.metaItem}>
-              <Calendar size={14} color="#10B981" />
-              <Text style={[styles.metaText, { color: '#10B981' }]}>
-                Finalizada: {(() => {
-                  try {
-                    return new Date(item.completedAt).toLocaleDateString('pt-BR');
-                  } catch (error) {
-                    console.error('Erro ao formatar data de finalização:', error);
-                    return 'Data inválida';
-                  }
-                })()}
+        <View style={styles.taskFooter}>
+          {item.assignedTo && (
+            <View style={styles.taskInfo}>
+              <User size={14} color={colors.textMuted} />
+              <Text style={[styles.taskInfoText, { color: colors.textMuted }]} numberOfLines={1}>
+                {item.assignedTo}
+              </Text>
+            </View>
+          )}
+          
+          {item.dueDate && (
+            <View style={styles.taskInfo}>
+              <Calendar size={14} color={colors.textMuted} />
+              <Text style={[styles.taskInfoText, { color: colors.textMuted }]}>
+                {new Date(item.dueDate).toLocaleDateString('pt-BR')}
               </Text>
             </View>
           )}
         </View>
-
-        <View style={styles.taskFooter}>
-          <Text style={styles.areaTag}>{item.area}</Text>
-          {item.photos.length > 0 && (
-            <Text style={styles.photoCount}>{item.photos.length} foto(s)</Text>
-          )}
-        </View>
       </TouchableOpacity>
+      
       <TouchableOpacity
-        style={styles.detailsButton}
+        style={[styles.detailsButton, { 
+          backgroundColor: colors.primary + '20',
+          borderColor: colors.primary + '40'
+        }]}
         onPress={() => handleTaskDetails(item)}
       >
-        <Text style={styles.detailsButtonText}>Ver detalhes</Text>
+        <Eye size={16} color={colors.primary} />
+        <Text style={[styles.detailsButtonText, { color: colors.primary }]}>Ver Detalhes</Text>
       </TouchableOpacity>
     </View>
   );
 
-  const pendingTasks = tasks.filter((task) => task.status === 'pending');
-  const inProgressTasks = tasks.filter((task) => task.status === 'in_progress');
-  const completedTasks = tasks.filter((task) => task.status === 'completed');
+  if (loading) {
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+        <View style={styles.loadingContainer}>
+          <Text style={[styles.loadingText, { color: colors.text }]}>Carregando tarefas...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Tarefas</Text>
-        <View style={styles.headerButtons}>
-          {userRole === 'admin' && (
-            <>
-              <TouchableOpacity style={styles.addButton} onPress={handleCreateTask}>
-                <Plus size={24} color="#FFFFFF" />
-              </TouchableOpacity>
-            </>
-          )}
-        </View>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      {/* Header */}
+      <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>{t('tasks')}</Text>
+        {userRole === 'admin' && (
+          <TouchableOpacity
+            style={[styles.addButton, { backgroundColor: colors.primary }]}
+            onPress={handleCreateTask}
+          >
+            <Plus size={20} color="#FFFFFF" />
+          </TouchableOpacity>
+        )}
       </View>
 
-      <View style={styles.statsContainer}>
-        <View style={styles.statCard}>
-          <Text style={styles.statNumber}>{pendingTasks.length}</Text>
-          <Text style={styles.statLabel}>Pendentes</Text>
-        </View>
-        <View style={styles.statCard}>
-          <Text style={styles.statNumber}>{inProgressTasks.length}</Text>
-          <Text style={styles.statLabel}>Em Andamento</Text>
-        </View>
-        <View style={styles.statCard}>
-          <Text style={styles.statNumber}>{completedTasks.length}</Text>
-          <Text style={styles.statLabel}>Concluídas</Text>
-        </View>
-      </View>
-
+      {/* Task List */}
       <FlatList
         data={tasks}
         renderItem={renderTaskItem}
-        keyExtractor={item => item.id}
-        contentContainerStyle={styles.listContainer}
+        keyExtractor={(item) => item.id}
+        style={styles.taskList}
+        contentContainerStyle={styles.taskListContent}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={[colors.primary]}
+            tintColor={colors.primary}
+          />
         }
-        showsVerticalScrollIndicator={false}
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+              Nenhuma tarefa encontrada
+            </Text>
+            {userRole === 'admin' && (
+              <TouchableOpacity
+                style={[styles.emptyButton, { backgroundColor: colors.primary }]}
+                onPress={handleCreateTask}
+              >
+                <Text style={styles.emptyButtonText}>Criar primeira tarefa</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        }
       />
 
+      {/* Task Modal */}
+      <TaskModal
+        visible={modalVisible}
+        task={selectedTask}
+        userRole={userRole}
+        onClose={() => setModalVisible(false)}
+        onSave={handleTaskSave}
+        detailsMode={detailsMode}
+      />
+
+      {/* Delete Confirmation Modal */}
       <Modal
         visible={deleteModalVisible}
         transparent
@@ -398,45 +410,33 @@ export default function TasksScreen() {
         onRequestClose={cancelDelete}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Confirmar exclusão</Text>
-              <TouchableOpacity
-                onPress={cancelDelete}
-                style={styles.closeButton}
-              >
-                <X size={24} color="#6B7280" />
+          <View style={[styles.deleteModal, { backgroundColor: colors.surface }]}>
+            <View style={styles.deleteModalHeader}>
+              <Text style={[styles.deleteModalTitle, { color: colors.text }]}>Confirmar Exclusão</Text>
+              <TouchableOpacity onPress={cancelDelete}>
+                <X size={24} color={colors.textMuted} />
               </TouchableOpacity>
             </View>
-            <Text style={styles.modalText}>
-              Tem certeza que deseja excluir esta tarefa?
+            <Text style={[styles.deleteModalText, { color: colors.textSecondary }]}>
+              Tem certeza que deseja excluir esta tarefa? Esta ação não pode ser desfeita.
             </Text>
-            <View style={styles.modalButtons}>
+            <View style={styles.deleteModalActions}>
               <TouchableOpacity
-                style={[styles.modalButton, styles.cancelButton]}
+                style={[styles.deleteModalButton, styles.cancelButton, { borderColor: colors.border }]}
                 onPress={cancelDelete}
               >
-                <Text style={styles.cancelButtonText}>Cancelar</Text>
+                <Text style={[styles.cancelButtonText, { color: colors.text }]}>Cancelar</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.modalButton, styles.deleteButton]}
+                style={[styles.deleteModalButton, styles.confirmButton, { backgroundColor: colors.error }]}
                 onPress={confirmDelete}
               >
-                <Text style={styles.deleteButtonText}>Excluir</Text>
+                <Text style={styles.confirmButtonText}>Excluir</Text>
               </TouchableOpacity>
             </View>
           </View>
         </View>
       </Modal>
-
-      <TaskModal
-        visible={modalVisible}
-        task={selectedTask}
-        userRole={userRole}
-        onSave={handleTaskSave}
-        onClose={() => setModalVisible(false)}
-        detailsMode={detailsMode}
-      />
     </SafeAreaView>
   );
 }
@@ -444,155 +444,137 @@ export default function TasksScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F3F4F6',
-  },
-  content: {
-    flex: 1,
-    padding: 16,
   },
   header: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 24,
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
   },
-  title: {
-    fontSize: 24,
-    fontFamily: 'Inter-SemiBold',
-    color: '#111827',
-  },
-  headerButtons: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  addButton: {
-    backgroundColor: '#2563EB',
-    padding: 12,
-    borderRadius: 12,
-    boxShadow: '0px 2px 4px rgba(0,0,0,0.1)',
-    elevation: 3,
-  },
-  statsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 24,
-  },
-  statCard: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
-    marginHorizontal: 4,
-    alignItems: 'center',
-    boxShadow: '0px 2px 4px rgba(0,0,0,0.1)',
-    elevation: 3,
-  },
-  statNumber: {
+  headerTitle: {
     fontSize: 24,
     fontFamily: 'Inter-Bold',
-    color: '#F97316',
   },
-  statLabel: {
-    fontSize: 12,
-    fontFamily: 'Inter-Medium',
-    color: '#6B7280',
-    marginTop: 4,
+  addButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  listContainer: {
-    padding: 16,
+  taskList: {
+    flex: 1,
   },
-  taskCard: {
-    backgroundColor: '#FFFFFF',
+  taskListContent: {
+    paddingHorizontal: 24,
+    paddingTop: 16,
+    paddingBottom: 24,
+  },
+  taskItemContainer: {
+    flexDirection: 'column',
+    gap: 8,
+    marginBottom: 12,
+  },
+  taskItem: {
+    flex: 1,
     borderRadius: 12,
     padding: 16,
-    marginBottom: 12,
-    boxShadow: '0px 0px 6px rgba(0,0,0,0.1)',
-    elevation: 4,
-    flexDirection: 'row',
-    alignItems: 'center',
+    borderWidth: 1,
+    position: 'relative',
   },
   taskHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 12,
+    marginBottom: 8,
   },
   taskTitleContainer: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
+    marginRight: 12,
   },
   taskTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontFamily: 'Inter-SemiBold',
-    color: '#111827',
-    flex: 1,
+    marginBottom: 4,
   },
-  priorityDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginLeft: 8,
-  },
-  taskActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  statusContainer: {
+  taskStatus: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   statusText: {
     fontSize: 12,
     fontFamily: 'Inter-Medium',
-    color: '#6B7280',
     marginLeft: 4,
+  },
+  priorityBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  priorityText: {
+    fontSize: 10,
+    fontFamily: 'Inter-SemiBold',
+    textTransform: 'uppercase',
   },
   taskDescription: {
     fontSize: 14,
     fontFamily: 'Inter-Regular',
-    color: '#6B7280',
+    marginBottom: 12,
     lineHeight: 20,
-    marginBottom: 16,
-  },
-  taskMeta: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-  },
-  metaItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  metaText: {
-    fontSize: 12,
-    fontFamily: 'Inter-Regular',
-    color: '#6B7280',
-    marginLeft: 4,
   },
   taskFooter: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 16,
   },
-  areaTag: {
-    fontSize: 12,
-    fontFamily: 'Inter-Medium',
-    color: '#F97316',
-    backgroundColor: '#FEF3F2',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
+  taskInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
-  photoCount: {
+  taskInfoText: {
     fontSize: 12,
     fontFamily: 'Inter-Regular',
-    color: '#6B7280',
   },
-  deleteIconButton: {
-    padding: 8,
+  deleteButton: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    fontSize: 16,
+    fontFamily: 'Inter-Medium',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 48,
+  },
+  emptyText: {
+    fontSize: 16,
+    fontFamily: 'Inter-Regular',
+    marginBottom: 16,
+  },
+  emptyButton: {
+    paddingHorizontal: 24,
+    paddingVertical: 12,
     borderRadius: 8,
+  },
+  emptyButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontFamily: 'Inter-SemiBold',
   },
   modalOverlay: {
     flex: 1,
@@ -600,71 +582,71 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  modalContent: {
-    backgroundColor: 'white',
-    borderRadius: 12,
+  deleteModal: {
+    borderRadius: 16,
     padding: 24,
     width: '90%',
     maxWidth: 400,
   },
-  modalHeader: {
+  deleteModalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 16,
   },
-  modalTitle: {
+  deleteModalTitle: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#111827',
+    fontFamily: 'Inter-SemiBold',
   },
-  closeButton: {
-    padding: 4,
-  },
-  modalText: {
-    fontSize: 16,
-    color: '#4B5563',
+  deleteModalText: {
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    lineHeight: 20,
     marginBottom: 24,
   },
-  modalButtons: {
+  deleteModalActions: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
     gap: 12,
   },
-  modalButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 6,
-  },
-  cancelButton: {
-    backgroundColor: '#F3F4F6',
-  },
-  deleteButton: {
-    backgroundColor: '#EF4444',
-  },
-  deleteButtonText: {
-    color: 'white',
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  cancelButtonText: {
-    color: '#4B5563',
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  detailsButton: {
-    backgroundColor: '#2563EB',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+  deleteModalButton: {
+    flex: 1,
+    paddingVertical: 12,
     borderRadius: 8,
-    marginLeft: 12,
-    minWidth: 100,
     alignItems: 'center',
   },
-  detailsButtonText: {
+  cancelButton: {
+    borderWidth: 1,
+  },
+  cancelButtonText: {
+    fontSize: 14,
+    fontFamily: 'Inter-SemiBold',
+  },
+  confirmButton: {
+    backgroundColor: '#EF4444',
+  },
+  confirmButtonText: {
     color: '#FFFFFF',
     fontSize: 14,
+    fontFamily: 'Inter-SemiBold',
+  },
+  taskHeaderActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  detailsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 8,
+    gap: 8,
+    borderWidth: 1,
+    alignSelf: 'flex-end',
+  },
+  detailsButtonText: {
+    fontSize: 12,
     fontFamily: 'Inter-Medium',
-    fontWeight: '500',
   },
 });

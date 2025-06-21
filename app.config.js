@@ -4,25 +4,23 @@ module.exports = {
   version: '1.0.0',
   orientation: 'portrait',
   userInterfaceStyle: 'automatic',
-  newArchEnabled: true,
   web: {
     bundler: 'metro',
-    output: 'static',
-    favicon: './assets/favicon.png',
-    build: {
-      babel: {
-        include: ['@expo/vector-icons']
-      }
-    }
+    favicon: './assets/favicon.png'
   },
   plugins: [
     'expo-router',
     'expo-font',
-    'expo-web-browser',
-    '@react-native-firebase/app'
+    'expo-web-browser'
   ],
-  experiments: {
-    typedRoutes: true,
-    tsconfigPaths: true
+  extra: {
+    firebase: {
+      apiKey: "AIzaSyDHJm219NVmB5KdQcLYRgOrp_coC_KbycQ",
+      authDomain: "bralimpa2.firebaseapp.com",
+      projectId: "bralimpa2",
+      storageBucket: "bralimpa2.firebasestorage.app",
+      messagingSenderId: "127747660506",
+      appId: "1:127747660506:web:b1d89516a0bc22698de3e3"
+    }
   }
 }; 

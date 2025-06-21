@@ -69,7 +69,7 @@ export default function WorkersScreen() {
   const handleDeleteWorker = async (workerId: string) => {
     Alert.alert(
       'Confirmar exclusão',
-      'Tem certeza que deseja remover este trabalhador?',
+      'Tem certeza que deseja remover este colaborador?',
       [
         {
           text: 'Cancelar',
@@ -82,10 +82,10 @@ export default function WorkersScreen() {
             try {
               await AuthService.getInstance().removeWorker(workerId);
               await loadData();
-              Alert.alert('Sucesso', 'Trabalhador removido com sucesso');
+              Alert.alert('Sucesso', 'Colaborador removido com sucesso');
             } catch (error) {
-              console.error('Erro ao remover trabalhador:', error);
-              Alert.alert('Erro', 'Não foi possível remover o trabalhador');
+              console.error('Erro ao remover colaborador:', error);
+              Alert.alert('Erro', 'Não foi possível remover o colaborador');
             }
           },
         },
@@ -193,7 +193,7 @@ export default function WorkersScreen() {
         >
           <ArrowLeft size={24} color="#000" />
         </TouchableOpacity>
-        <Text style={styles.title}>Gerenciar Trabalhadores</Text>
+        <Text style={styles.title}>Gerenciar Colaboradores</Text>
         <TouchableOpacity
           style={styles.addButton}
           onPress={handleInvite}

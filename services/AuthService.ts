@@ -4,6 +4,9 @@ import {
   signInWithEmailAndPassword,
   signOut,
   User as FirebaseUser,
+  updatePassword,
+  EmailAuthProvider,
+  reauthenticateWithCredential,
 } from 'firebase/auth';
 import {
   collection,
@@ -36,6 +39,7 @@ export interface User {
     taskUpdate?: boolean;
     loginConfirmation?: boolean;
   };
+  inviteId?: string;
 }
 
 export interface Site {
@@ -207,10 +211,10 @@ export class AuthService {
     try {
       let invite: Invite | undefined;
 
-      // Se for trabalhador, verificar convite
+      // Se for colaborador, verificar convite
       if (userData.role === 'worker') {
         if (!userData.inviteId) {
-          throw new Error('Convite necessário para cadastro de trabalhador');
+          throw new Error('Convite necessário para cadastro de colaborador');
         }
 
         const inviteDoc = await getDoc(doc(db, 'invites', userData.inviteId));
@@ -261,6 +265,7 @@ export class AuthService {
         sites: userData.role === 'admin' ? [siteId] : [invite?.siteId || ''],
         status: 'active',
         siteId: userData.role === 'admin' ? siteId : undefined,
+        inviteId: userData.inviteId,
       };
 
       await setDoc(doc(db, 'users', user.id), user);
@@ -452,17 +457,25 @@ export class AuthService {
 
   async getWorkers(): Promise<User[]> {
     try {
-      const workersQuery = query(
-        collection(db, 'users'),
-        where('role', '==', 'worker')
-      );
-      const snapshot = await getDocs(workersQuery);
-      return snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      } as User));
+      console.log('[getWorkers] Iniciando busca de colaboradores...');
+      const workersSnapshot = await getDocs(collection(db, 'users'));
+      console.log('[getWorkers] Total de usuários encontrados:', workersSnapshot.size);
+      
+      const workers = workersSnapshot.docs
+        .map(doc => {
+          const data = doc.data();
+          console.log('[getWorkers] Colaborador encontrado:', { id: doc.id, name: data.name, email: data.email, inviteId: data.inviteId });
+          return {
+            id: doc.id,
+            ...data
+          } as User;
+        })
+        .filter(worker => !!worker.inviteId); // Filtrar apenas quem veio de convite
+      
+      console.log('[getWorkers] Lista final de colaboradores (apenas convidados):', workers.map(w => ({ id: w.id, name: w.name, email: w.email })));
+      return workers;
     } catch (error) {
-      console.error('Erro ao buscar trabalhadores:', error);
+      console.error('Erro ao buscar colaboradores:', error);
       throw error;
     }
   }
@@ -478,7 +491,7 @@ export class AuthService {
         ...workerDoc.data(),
       } as User;
     } catch (error) {
-      console.error('Erro ao obter trabalhador:', error);
+      console.error('Erro ao obter colaborador:', error);
       throw error;
     }
   }
@@ -490,7 +503,7 @@ export class AuthService {
         updatedAt: serverTimestamp(),
       });
     } catch (error) {
-      console.error('Erro ao atualizar trabalhador:', error);
+      console.error('Erro ao atualizar colaborador:', error);
       throw error;
     }
   }
@@ -502,7 +515,7 @@ export class AuthService {
         updatedAt: serverTimestamp(),
       });
     } catch (error) {
-      console.error('Erro ao remover trabalhador:', error);
+      console.error('Erro ao remover colaborador:', error);
       throw error;
     }
   }
@@ -726,6 +739,28 @@ export class AuthService {
     } catch (error) {
       console.error('Error getting user by email:', error);
       return null;
+    }
+  }
+
+  static async changePassword(currentPassword: string, newPassword: string): Promise<boolean> {
+    try {
+      const currentUser = auth.currentUser;
+      if (!currentUser || !currentUser.email) {
+        throw new Error('Usuário não autenticado');
+      }
+
+      // Reautenticar o usuário antes de alterar a senha
+      const credential = EmailAuthProvider.credential(currentUser.email, currentPassword);
+      await reauthenticateWithCredential(currentUser, credential);
+
+      // Alterar a senha
+      await updatePassword(currentUser, newPassword);
+
+      console.log('Senha alterada com sucesso');
+      return true;
+    } catch (error) {
+      console.error('Erro ao alterar senha:', error);
+      throw error;
     }
   }
 }

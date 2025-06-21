@@ -113,10 +113,10 @@ export function TaskModal({ visible, task, userRole, onSave, onClose, detailsMod
       style={[
         styles.modernStatusButton,
         formData.status === status && styles.modernStatusButtonActive,
-        isReadOnly && styles.buttonDisabled,
+        !canEdit && styles.buttonDisabled,
       ]}
       onPress={() => {
-        if (!isReadOnly) {
+        if (canEdit) {
           const newFormData = { ...formData, status };
           // Se o status for "completed", preencher automaticamente a data de finalização no formato DD/MM/AAAA
           if (status === 'completed' && !formData.completedDate) {
@@ -131,7 +131,7 @@ export function TaskModal({ visible, task, userRole, onSave, onClose, detailsMod
           setFormData(newFormData);
         }
       }}
-      disabled={isReadOnly}
+      disabled={!canEdit}
     >
       <Text
         style={[
@@ -149,10 +149,10 @@ export function TaskModal({ visible, task, userRole, onSave, onClose, detailsMod
       style={[
         styles.modernPriorityButton,
         formData.priority === priority && { backgroundColor: color + '15', borderColor: color },
-        (!canEdit || isReadOnly) && styles.buttonDisabled,
+        !canEdit && styles.buttonDisabled,
       ]}
-      onPress={() => canEdit && !isReadOnly && setFormData({ ...formData, priority })}
-      disabled={!canEdit || isReadOnly}
+      onPress={() => canEdit && setFormData({ ...formData, priority })}
+      disabled={!canEdit}
     >
       <Flag size={16} color={formData.priority === priority ? color : '#6B7280'} />
       <Text
@@ -530,26 +530,26 @@ export function TaskModal({ visible, task, userRole, onSave, onClose, detailsMod
                 <View style={styles.inputGroup}>
                   <Text style={styles.modernLabel}>Título da Tarefa</Text>
             <TextInput
-                    style={[styles.modernInput, isReadOnly && styles.inputDisabled]}
+                    style={[styles.modernInput, !canEdit && styles.inputDisabled]}
               value={formData.title}
               onChangeText={(text) => setFormData({ ...formData, title: text })}
                     placeholder="Digite um título claro e objetivo"
                     placeholderTextColor="#9CA3AF"
-              editable={!isReadOnly && userRole === 'admin'}
+              editable={canEdit}
             />
           </View>
 
                 <View style={styles.inputGroup}>
                   <Text style={styles.modernLabel}>Descrição Detalhada</Text>
             <TextInput
-                    style={[styles.modernTextArea, isReadOnly && styles.inputDisabled]}
+                    style={[styles.modernTextArea, !canEdit && styles.inputDisabled]}
               value={formData.description}
               onChangeText={(text) => setFormData({ ...formData, description: text })}
                     placeholder="Descreva os detalhes, requisitos e especificações da tarefa"
                     placeholderTextColor="#9CA3AF"
               multiline
               numberOfLines={4}
-              editable={!isReadOnly && userRole === 'admin'}
+              editable={canEdit}
             />
                 </View>
           </View>
@@ -597,12 +597,12 @@ export function TaskModal({ visible, task, userRole, onSave, onClose, detailsMod
                     <Text style={styles.modernLabel}>Responsável pela Tarefa</Text>
                   </View>
             <TextInput
-                    style={[styles.modernInput, userRole !== 'admin' && styles.inputDisabled]}
+                    style={[styles.modernInput, !canEdit && styles.inputDisabled]}
               value={formData.assignedTo}
               onChangeText={(text) => setFormData({ ...formData, assignedTo: text })}
                     placeholder="Nome do responsável pela execução"
                     placeholderTextColor="#9CA3AF"
-              editable={userRole === 'admin'}
+              editable={canEdit}
             />
           </View>
 
@@ -612,12 +612,12 @@ export function TaskModal({ visible, task, userRole, onSave, onClose, detailsMod
                     <Text style={styles.modernLabel}>Local de Execução</Text>
                   </View>
             <TextInput
-                    style={[styles.modernInput, userRole !== 'admin' && styles.inputDisabled]}
+                    style={[styles.modernInput, !canEdit && styles.inputDisabled]}
               value={formData.area}
               onChangeText={(text) => setFormData({ ...formData, area: text })}
                     placeholder="Área ou local específico da tarefa"
                     placeholderTextColor="#9CA3AF"
-              editable={userRole === 'admin'}
+              editable={canEdit}
             />
                 </View>
           </View>
@@ -644,12 +644,12 @@ export function TaskModal({ visible, task, userRole, onSave, onClose, detailsMod
                     </View>
                     <View style={styles.dateInputContainer}>
             <TextInput
-                        style={[styles.modernDateInput, isReadOnly && styles.inputDisabled]}
+                        style={[styles.modernDateInput, !canEdit && styles.inputDisabled]}
               value={formData.dueDate}
               onChangeText={(text) => setFormData({ ...formData, dueDate: text })}
                         placeholder="DD/MM/AAAA"
                         placeholderTextColor="#9CA3AF"
-              editable={!isReadOnly && userRole === 'admin'}
+              editable={canEdit}
             />
                       <View style={styles.dateInputIcon}>
                         <Calendar size={16} color="#6B7280" />
@@ -669,12 +669,12 @@ export function TaskModal({ visible, task, userRole, onSave, onClose, detailsMod
                     </View>
                     <View style={styles.dateInputContainer}>
                       <TextInput
-                        style={[styles.modernDateInput, isReadOnly && styles.inputDisabled]}
+                        style={[styles.modernDateInput, !canEdit && styles.inputDisabled]}
                         value={formData.completedDate}
                         onChangeText={(text) => setFormData({ ...formData, completedDate: text })}
                         placeholder="DD/MM/AAAA"
                         placeholderTextColor="#9CA3AF"
-                        editable={!isReadOnly && userRole === 'admin'}
+                        editable={canEdit}
                       />
                       <View style={styles.dateInputIcon}>
                         <Calendar size={16} color="#6B7280" />
@@ -695,9 +695,9 @@ export function TaskModal({ visible, task, userRole, onSave, onClose, detailsMod
 
                 <View style={styles.modernMediaButtons}>
               <TouchableOpacity 
-                    style={[styles.modernMediaButton, isReadOnly && styles.buttonDisabled]} 
+                    style={[styles.modernMediaButton, !canEdit && styles.buttonDisabled]} 
                 onPress={pickImage}
-                disabled={isReadOnly}
+                disabled={!canEdit}
               >
                     <View style={styles.mediaButtonIcon}>
                 <ImagePlus size={20} color="#6B7280" />
@@ -707,9 +707,9 @@ export function TaskModal({ visible, task, userRole, onSave, onClose, detailsMod
               </TouchableOpacity>
                   
               <TouchableOpacity 
-                    style={[styles.modernMediaButton, isReadOnly && styles.buttonDisabled]} 
+                    style={[styles.modernMediaButton, !canEdit && styles.buttonDisabled]} 
                 onPress={pickVideo}
-                disabled={isReadOnly}
+                disabled={!canEdit}
               >
                     <View style={styles.mediaButtonIcon}>
                 <Video size={20} color="#6B7280" />
@@ -734,7 +734,7 @@ export function TaskModal({ visible, task, userRole, onSave, onClose, detailsMod
                               <Text style={styles.mediaTypeText}>📷</Text>
                             </View>
                           </TouchableOpacity>
-                    {!isReadOnly && (
+                    {canEdit && (
                       <TouchableOpacity 
                               style={styles.modernRemoveButton}
                         onPress={() => removeMedia('photo', index)}
@@ -758,7 +758,7 @@ export function TaskModal({ visible, task, userRole, onSave, onClose, detailsMod
                               <Text style={styles.mediaTypeText}>🎥</Text>
                             </View>
                           </TouchableOpacity>
-                    {!isReadOnly && (
+                    {canEdit && (
                       <TouchableOpacity 
                               style={styles.modernRemoveButton}
                         onPress={() => removeMedia('video', index)}
@@ -781,13 +781,30 @@ export function TaskModal({ visible, task, userRole, onSave, onClose, detailsMod
           <TouchableOpacity style={styles.cancelButton} onPress={onClose}>
             <Text style={styles.cancelButtonText}>Cancelar</Text>
           </TouchableOpacity>
-          {!isReadOnly && (
+          {userRole === 'admin' && (
             <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
               <Text style={styles.saveButtonText}>
                 {isEditing ? 'Salvar' : 'Criar Tarefa'}
               </Text>
             </TouchableOpacity>
           )}
+        </View>
+        )}
+
+        {detailsMode && userRole === 'admin' && (
+        <View style={styles.footer}>
+          <TouchableOpacity style={styles.cancelButton} onPress={onClose}>
+            <Text style={styles.cancelButtonText}>Fechar</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.saveButton} 
+            onPress={() => {
+              // Simplesmente fechar o modal de detalhes
+              onClose();
+            }}
+          >
+            <Text style={styles.saveButtonText}>Editar Tarefa</Text>
+          </TouchableOpacity>
         </View>
         )}
 
