@@ -101,11 +101,7 @@ export default function LoginScreen() {
   };
 
   const handleForgotPassword = () => {
-    Alert.alert(
-      'Recuperar Senha',
-      'Entre em contato com o administrador do sistema para redefinir sua senha.',
-      [{ text: 'OK', style: 'default' }]
-    );
+    router.push('/(auth)/forgot-password');
   };
 
   const handleRegister = (role: 'admin' | 'worker') => {

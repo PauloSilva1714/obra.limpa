@@ -21,14 +21,23 @@ export default function TabLayout() {
   useEffect(() => {
     const getUserRole = async () => {
       try {
+        console.log('=== DEBUG: Obtendo papel do usuário ===');
         const role = await AuthService.getUserRole();
+        console.log('Papel do usuário obtido:', role);
         setUserRole(role);
+        
+        // Debug adicional: verificar dados do usuário
+        const currentUser = await AuthService.getCurrentUser();
+        console.log('Usuário atual:', currentUser);
+        console.log('=== FIM DEBUG ===');
       } catch (error) {
         console.error('Erro ao obter papel do usuário:', error);
       }
     };
     getUserRole();
   }, []);
+
+  console.log('Renderizando TabLayout com userRole:', userRole);
 
   return (
     <Tabs

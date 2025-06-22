@@ -18,6 +18,9 @@ const GMAIL_CONFIG = {
 // Função de envio de email
 export const sendEmailV2 = functions.https.onCall(async (request, context) => {
   try {
+    console.log('Iniciando envio de email...');
+    console.log('Dados recebidos:', request.data);
+    
     // Importação dinâmica do nodemailer
     const nodemailer = await import("nodemailer");
     
@@ -25,12 +28,15 @@ export const sendEmailV2 = functions.https.onCall(async (request, context) => {
     
     // Validação dos dados
     if (!to || !subject) {
+      console.error('Dados inválidos:', { to, subject });
       return {
         success: false,
         error: "Email e assunto são obrigatórios"
       };
     }
 
+    console.log('Configurando transporter...');
+    
     // Configuração do transporte
     const transporter = nodemailer.createTransport({
       service: "gmail",
@@ -40,6 +46,11 @@ export const sendEmailV2 = functions.https.onCall(async (request, context) => {
       },
     });
 
+    // Verificar conexão
+    console.log('Verificando conexão...');
+    await transporter.verify();
+    console.log('Conexão verificada com sucesso');
+
     const mailOptions = {
       from: GMAIL_CONFIG.user,
       to,
@@ -48,7 +59,10 @@ export const sendEmailV2 = functions.https.onCall(async (request, context) => {
       html: html || "",
     };
 
-    await transporter.sendMail(mailOptions);
+    console.log('Enviando email...');
+    const result = await transporter.sendMail(mailOptions);
+    console.log('Email enviado com sucesso:', result);
+    
     return {success: true};
     
   } catch (error) {

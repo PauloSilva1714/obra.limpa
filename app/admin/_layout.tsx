@@ -18,6 +18,8 @@ export default function AdminLayout() {
       <Stack.Screen name="sites/edit" />
       <Stack.Screen name="workers" />
       <Stack.Screen name="workers/invite" />
+      <Stack.Screen name="workers/invite-admin" />
+      <Stack.Screen name="workers/admins" />
       <Stack.Screen name="stats" />
     </Stack>
   );

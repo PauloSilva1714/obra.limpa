@@ -9,7 +9,7 @@ import {
   SafeAreaView,
 } from 'react-native';
 import { router } from 'expo-router';
-import { Plus, Edit, Trash2, ArrowLeft, UserPlus } from 'lucide-react-native';
+import { Plus, Edit, Trash2, ArrowLeft, UserPlus, Crown } from 'lucide-react-native';
 import { AuthService } from '@/services/AuthService';
 
 interface Worker {
@@ -57,6 +57,14 @@ export default function WorkersScreen() {
 
   const handleInvite = () => {
     router.push('/admin/workers/invite');
+  };
+
+  const handleInviteAdmin = () => {
+    router.push('/admin/workers/invite-admin');
+  };
+
+  const handleViewAdmins = () => {
+    router.push('/admin/workers/admins');
   };
 
   const handleEditWorker = (workerId: string) => {
@@ -193,12 +201,44 @@ export default function WorkersScreen() {
         >
           <ArrowLeft size={24} color="#000" />
         </TouchableOpacity>
-        <Text style={styles.title}>Gerenciar Colaboradores</Text>
+        <Text style={styles.title}>Gerenciar Equipe</Text>
+        <View style={styles.headerActions}>
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={handleInviteAdmin}
+          >
+            <UserPlus size={20} color="#000" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={handleInvite}
+          >
+            <Plus size={20} color="#000" />
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      <View style={styles.quickActions}>
         <TouchableOpacity
-          style={styles.addButton}
+          style={styles.quickActionButton}
+          onPress={handleViewAdmins}
+        >
+          <Crown size={16} color="#8B5CF6" />
+          <Text style={styles.quickActionText}>Ver Admins</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.quickActionButton}
+          onPress={handleInviteAdmin}
+        >
+          <UserPlus size={16} color="#3B82F6" />
+          <Text style={styles.quickActionText}>Convidar Admin</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.quickActionButton}
           onPress={handleInvite}
         >
-          <UserPlus size={24} color="#000" />
+          <UserPlus size={16} color="#10B981" />
+          <Text style={styles.quickActionText}>Convidar Colaborador</Text>
         </TouchableOpacity>
       </View>
 
@@ -247,8 +287,12 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
   },
-  addButton: {
+  headerActions: {
+    flexDirection: 'row',
+  },
+  actionButton: {
     padding: 8,
+    marginLeft: 8,
   },
   list: {
     padding: 16,
@@ -277,10 +321,6 @@ const styles = StyleSheet.create({
   },
   workerActions: {
     flexDirection: 'row',
-  },
-  actionButton: {
-    padding: 8,
-    marginLeft: 8,
   },
   workerInfo: {
     borderTopWidth: 1,
@@ -320,5 +360,27 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  quickActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    padding: 16,
+    gap: 8,
+  },
+  quickActionButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    borderRadius: 8,
+    backgroundColor: '#fff',
+  },
+  quickActionText: {
+    fontSize: 14,
+    fontWeight: '500',
+    marginLeft: 8,
   },
 }); 

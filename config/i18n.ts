@@ -1,5 +1,6 @@
 import * as Localization from 'expo-localization';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useState, useEffect } from 'react';
 
 // Traduções para todos os idiomas
 const translations = {
@@ -367,6 +368,39 @@ const i18n = {
   locale: currentLocale,
   translations,
   fallbacks: true,
+};
+
+// Hook para usar traduções em componentes React
+export const useTranslation = () => {
+  const [locale, setLocaleState] = useState(currentLocale);
+
+  useEffect(() => {
+    loadSavedLanguage().then((savedLocale) => {
+      setLocaleState(savedLocale);
+    });
+  }, []);
+
+  const t = (key: string): string => {
+    const currentTranslations = translations[locale] || translations['pt-BR'];
+    return currentTranslations[key] || key;
+  };
+
+  const setLanguage = async (language: string): Promise<void> => {
+    try {
+      await AsyncStorage.setItem('language', language);
+      currentLocale = language;
+      setLocaleState(language);
+    } catch (error) {
+      console.log('Erro ao salvar idioma:', error);
+    }
+  };
+
+  return {
+    t,
+    locale,
+    setLanguage,
+    translations,
+  };
 };
 
 export default i18n; 

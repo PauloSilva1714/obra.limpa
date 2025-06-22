@@ -17,7 +17,10 @@ export const EmailService = {
    */
   async sendEmail(emailData: EmailData): Promise<{ success: boolean; error?: string }> {
     try {
+      console.log('Tentando enviar email:', emailData);
       const result = await sendEmailV2(emailData);
+      
+      console.log('Resultado do envio de email:', result);
       
       if (result.data.success) {
         return { success: true };
@@ -34,6 +37,25 @@ export const EmailService = {
         error: error instanceof Error ? error.message : String(error)
       };
     }
+  },
+
+  /**
+   * Método de teste para verificar se o envio de email está funcionando
+   */
+  async testEmail(email: string): Promise<{ success: boolean; error?: string }> {
+    return this.sendEmail({
+      to: email,
+      subject: 'Teste de Email - Obra Limpa',
+      text: 'Este é um email de teste para verificar se o sistema de envio de emails está funcionando corretamente.',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #2563EB;">🧪 Teste de Email</h2>
+          <p>Este é um email de teste para verificar se o sistema de envio de emails está funcionando corretamente.</p>
+          <p><strong>Data e hora:</strong> ${new Date().toLocaleString('pt-BR')}</p>
+          <p>Se você recebeu este email, significa que o sistema está funcionando!</p>
+        </div>
+      `
+    });
   },
 
   /**
@@ -199,11 +221,17 @@ export const EmailService = {
       subject: `Nova Tarefa: ${taskTitle}`,
       text: `Você foi designado para uma nova tarefa: ${taskTitle}\n\nDescrição: ${taskDescription}\n\nDesignado por: ${assignedBy}`,
       html: `
-        <h2>Nova Tarefa Designada</h2>
-        <p><strong>Tarefa:</strong> ${taskTitle}</p>
-        <p><strong>Descrição:</strong> ${taskDescription}</p>
-        <p><strong>Designado por:</strong> ${assignedBy}</p>
-        <p>Acesse o app Obra Limpa para mais detalhes.</p>
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #2563EB;">📋 Nova Tarefa Designada</h2>
+          <div style="background-color: #f8fafc; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <h3 style="color: #1f2937; margin-top: 0;">${taskTitle}</h3>
+            <p style="color: #6b7280; line-height: 1.6;">${taskDescription}</p>
+            <p><strong>Designado por:</strong> ${assignedBy}</p>
+          </div>
+          <p style="color: #6b7280; font-size: 14px;">
+            Acesse o app Obra Limpa para ver os detalhes e começar a trabalhar.
+          </p>
+        </div>
       `
     });
   },
@@ -274,5 +302,133 @@ export const EmailService = {
         <p style="margin-top: 16px;"><strong>Taxa de Conclusão:</strong> ${completionRate}%</p>
       `
     });
-  }
+  },
+
+  /**
+   * Envia convite de administrador
+   */
+  async sendAdminInvite(
+    inviteData: {
+      email: string;
+      siteName: string;
+      invitedBy: string;
+      inviteId: string;
+    }
+  ): Promise<{ success: boolean; error?: string }> {
+    // Determinar a URL base baseada no ambiente
+    const baseUrl = typeof window !== 'undefined' 
+      ? window.location.origin 
+      : 'https://obra-limpa.vercel.app'; // URL de produção como fallback
+    
+    const inviteUrl = `${baseUrl}/(auth)/register?role=admin&inviteId=${inviteData.inviteId}`;
+    
+    return this.sendEmail({
+      to: inviteData.email,
+      subject: `Convite para Administrador - Obra Limpa`,
+      text: `Você foi convidado para ser administrador da obra "${inviteData.siteName}" no sistema Obra Limpa.\n\nConvidado por: ${inviteData.invitedBy}\n\nPara aceitar o convite, acesse: ${inviteUrl}\n\nEste convite expira em 7 dias.`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #7c3aed;">👑 Convite de Administrador</h2>
+          <div style="background-color: #faf5ff; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #7c3aed;">
+            <h3 style="color: #1f2937; margin-top: 0;">Você foi convidado!</h3>
+            <p><strong>Obra:</strong> ${inviteData.siteName}</p>
+            <p><strong>Convidado por:</strong> ${inviteData.invitedBy}</p>
+            <p><strong>Função:</strong> Administrador</p>
+          </div>
+          <div style="background-color: #f8fafc; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <h4 style="color: #374151; margin-top: 0;">Como aceitar o convite:</h4>
+            <ol style="color: #6b7280; line-height: 1.6;">
+              <li>Clique no botão abaixo ou acesse o link</li>
+              <li>Complete seu cadastro como administrador</li>
+              <li>Use o código de convite: <strong>${inviteData.inviteId}</strong></li>
+              <li>Comece a gerenciar a obra!</li>
+            </ol>
+          </div>
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${inviteUrl}" style="
+              display: inline-block;
+              background-color: #7c3aed;
+              color: white;
+              padding: 12px 24px;
+              text-decoration: none;
+              border-radius: 8px;
+              font-weight: bold;
+            ">
+              Aceitar Convite
+            </a>
+          </div>
+          <p style="color: #6b7280; font-size: 14px; text-align: center;">
+            Ou acesse: <a href="${inviteUrl}" style="color: #7c3aed;">${inviteUrl}</a>
+          </p>
+          <p style="color: #6b7280; font-size: 12px; margin-top: 20px; text-align: center;">
+            Este convite expira em 7 dias. Se você não esperava este convite, pode ignorá-lo.
+          </p>
+        </div>
+      `
+    });
+  },
+
+  /**
+   * Envia convite de colaborador
+   */
+  async sendWorkerInvite(
+    inviteData: {
+      email: string;
+      siteName: string;
+      invitedBy: string;
+      inviteId: string;
+    }
+  ): Promise<{ success: boolean; error?: string }> {
+    // Determinar a URL base baseada no ambiente
+    const baseUrl = typeof window !== 'undefined' 
+      ? window.location.origin 
+      : 'https://obra-limpa.vercel.app'; // URL de produção como fallback
+    
+    const inviteUrl = `${baseUrl}/(auth)/register?role=worker&inviteId=${inviteData.inviteId}`;
+    
+    return this.sendEmail({
+      to: inviteData.email,
+      subject: `Convite para Colaborador - Obra Limpa`,
+      text: `Você foi convidado para ser colaborador da obra "${inviteData.siteName}" no sistema Obra Limpa.\n\nConvidado por: ${inviteData.invitedBy}\n\nPara aceitar o convite, acesse: ${inviteUrl}\n\nEste convite expira em 7 dias.`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #059669;">👷 Convite de Colaborador</h2>
+          <div style="background-color: #f0fdf4; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #059669;">
+            <h3 style="color: #1f2937; margin-top: 0;">Você foi convidado!</h3>
+            <p><strong>Obra:</strong> ${inviteData.siteName}</p>
+            <p><strong>Convidado por:</strong> ${inviteData.invitedBy}</p>
+            <p><strong>Função:</strong> Colaborador</p>
+          </div>
+          <div style="background-color: #f8fafc; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <h4 style="color: #374151; margin-top: 0;">Como aceitar o convite:</h4>
+            <ol style="color: #6b7280; line-height: 1.6;">
+              <li>Clique no botão abaixo ou acesse o link</li>
+              <li>Complete seu cadastro como colaborador</li>
+              <li>Use o código de convite: <strong>${inviteData.inviteId}</strong></li>
+              <li>Comece a trabalhar na obra!</li>
+            </ol>
+          </div>
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${inviteUrl}" style="
+              display: inline-block;
+              background-color: #059669;
+              color: white;
+              padding: 12px 24px;
+              text-decoration: none;
+              border-radius: 8px;
+              font-weight: bold;
+            ">
+              Aceitar Convite
+            </a>
+          </div>
+          <p style="color: #6b7280; font-size: 14px; text-align: center;">
+            Ou acesse: <a href="${inviteUrl}" style="color: #059669;">${inviteUrl}</a>
+          </p>
+          <p style="color: #6b7280; font-size: 12px; margin-top: 20px; text-align: center;">
+            Este convite expira em 7 dias. Se você não esperava este convite, pode ignorá-lo.
+          </p>
+        </div>
+      `
+    });
+  },
 }; 
