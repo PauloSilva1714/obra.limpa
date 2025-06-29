@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { AuthService, User } from '@/services/AuthService';
-import { InviteService } from '@/services/InviteService';
+import { AuthService } from '../../services/AuthService';
+import { InviteService } from '../../services/InviteService';
+import { ConfirmationModal } from '../../components/ConfirmationModal';
 import { Trash2 } from 'lucide-react-native';
-import { ConfirmationModal } from '@/components/ConfirmationModal';
 
 interface Invite {
   id: string;
@@ -13,6 +13,9 @@ interface Invite {
   siteId: string;
   createdAt: any;
 }
+
+// Importar o tipo User
+type User = any; // Temporário até definir o tipo correto
 
 export default function InvitesScreen() {
   const [invites, setInvites] = useState<Invite[]>([]);
@@ -37,8 +40,8 @@ export default function InvitesScreen() {
         }
       } else {
         try {
-          const data = await AuthService.getInvitesForCurrentUser();
-          setInvites(data);
+          const data = await InviteService.getInvitesForCurrentUser();
+          setInvites(data as Invite[]);
         } catch (error) {
           Alert.alert('Erro', 'Não foi possível carregar seus convites.');
         }
@@ -61,8 +64,8 @@ export default function InvitesScreen() {
       }
     } else {
       try {
-        const data = await AuthService.getInvitesForCurrentUser();
-        setInvites(data);
+        const data = await InviteService.getInvitesForCurrentUser();
+        setInvites(data as Invite[]);
       } catch (error) {
         Alert.alert('Erro', 'Não foi possível carregar seus convites.');
       }
@@ -88,7 +91,7 @@ export default function InvitesScreen() {
         await InviteService.deleteInvite(inviteToDelete);
       } else {
         console.log('Chamando AuthService.cancelInvite com o ID:', inviteToDelete);
-        await AuthService.cancelInvite(inviteToDelete);
+        await AuthService.getInstance().cancelInvite(inviteToDelete);
       }
       console.log('Ação de exclusão/cancelamento concluída. Recarregando convites.');
       await fetchInvites();

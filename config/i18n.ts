@@ -3,6 +3,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useState, useEffect } from 'react';
 
 // Traduções para todos os idiomas
+type SupportedLocales = 'pt-BR' | 'en-US' | 'es-ES' | 'ht-HT';
+
 const translations = {
   'pt-BR': {
     // Configurações
@@ -334,8 +336,8 @@ let currentLocale = 'pt-BR';
 
 // Função para obter tradução
 export const t = (key: string): string => {
-  const currentTranslations = translations[currentLocale] || translations['pt-BR'];
-  return currentTranslations[key] || key;
+  const currentTranslations = translations[currentLocale as SupportedLocales] || translations['pt-BR'];
+  return currentTranslations[key as keyof TranslationKeys] || key;
 };
 
 // Função para carregar idioma salvo
@@ -381,8 +383,8 @@ export const useTranslation = () => {
   }, []);
 
   const t = (key: string): string => {
-    const currentTranslations = translations[locale] || translations['pt-BR'];
-    return currentTranslations[key] || key;
+    const currentTranslations = translations[locale as SupportedLocales] || translations['pt-BR'];
+    return currentTranslations[key as keyof TranslationKeys] || key;
   };
 
   const setLanguage = async (language: string): Promise<void> => {
@@ -402,5 +404,9 @@ export const useTranslation = () => {
     translations,
   };
 };
+
+// Definir tipos após o objeto translations
+type TranslationKeys = typeof translations['pt-BR'];
+type TranslationsType = typeof translations;
 
 export default i18n; 

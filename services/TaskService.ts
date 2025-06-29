@@ -11,6 +11,7 @@ import {
   deleteDoc,
   serverTimestamp,
   orderBy,
+  onSnapshot,
 } from 'firebase/firestore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AuthService } from './AuthService';
@@ -30,9 +31,18 @@ export interface Task {
   photos: string[];
   videos: string[];
   area: string;
+  comments?: Comment[];
 }
 
-class TaskService {
+export interface Comment {
+  id: string;
+  text: string;
+  userId: string;
+  userName: string;
+  timestamp: string;
+}
+
+export class TaskService {
   private static instance: TaskService;
   private static TASKS_KEY = 'tasks';
 
@@ -55,7 +65,7 @@ class TaskService {
     }
   }
 
-  async getTasks(): Promise<Task[]> {
+  static async getTasks(): Promise<Task[]> {
     try {
       console.log('[TaskService] Iniciando busca de tarefas...');
       const currentSite = await AuthService.getCurrentSite();
@@ -99,7 +109,7 @@ class TaskService {
     }
   }
 
-  async createTask(
+  static async createTask(
     task: Omit<Task, 'id' | 'createdAt' | 'updatedAt'>
   ): Promise<Task> {
     try {
@@ -118,8 +128,8 @@ class TaskService {
         siteId: currentSite.id,
         createdAt: now,
         updatedAt: now,
-        photos: task.photos?.filter(url => this.validateMediaUrl(url)) || [],
-        videos: task.videos?.filter(url => this.validateMediaUrl(url)) || [],
+        photos: task.photos?.filter(url => TaskService.validateMediaUrlStatic(url)) || [],
+        videos: task.videos?.filter(url => TaskService.validateMediaUrlStatic(url)) || [],
         status: task.status || 'pending',
         priority: task.priority || 'medium',
       };
@@ -132,7 +142,7 @@ class TaskService {
       console.log('[TaskService] Tarefa criada com ID:', docRef.id);
 
       // Verificar se a tarefa foi realmente criada
-      const createdTask = await this.getTaskById(docRef.id);
+      const createdTask = await TaskService.getTaskById(docRef.id);
       console.log('[TaskService] Tarefa criada confirmada:', createdTask);
 
       return {
@@ -145,22 +155,26 @@ class TaskService {
     }
   }
 
-  async updateTask(taskId: string, updates: Partial<Task>): Promise<void> {
+  static async addTask(
+    task: Omit<Task, 'id' | 'createdAt' | 'updatedAt'>
+  ): Promise<Task> {
+    return this.createTask(task);
+  }
+
+  static async updateTask(taskId: string, updates: Partial<Task>): Promise<void> {
     try {
       const updateData: any = {
         ...updates,
-        photos: updates.photos?.filter(url => this.validateMediaUrl(url)) || [],
-        videos: updates.videos?.filter(url => this.validateMediaUrl(url)) || [],
+        photos: updates.photos?.filter(url => TaskService.validateMediaUrlStatic(url)) || [],
+        videos: updates.videos?.filter(url => TaskService.validateMediaUrlStatic(url)) || [],
         updatedAt: serverTimestamp(),
       };
-      
       // Remover campos undefined
       Object.keys(updateData).forEach(key => {
         if (updateData[key] === undefined) {
           delete updateData[key];
         }
       });
-      
       await updateDoc(doc(db, 'tasks', taskId), updateData);
     } catch (error) {
       console.error('Erro ao atualizar tarefa:', error);
@@ -168,7 +182,7 @@ class TaskService {
     }
   }
 
-  async deleteTask(taskId: string): Promise<void> {
+  static async deleteTask(taskId: string): Promise<void> {
     try {
       console.log('TaskService: Iniciando exclusão da tarefa:', taskId);
       const taskRef = doc(db, 'tasks', taskId);
@@ -178,6 +192,17 @@ class TaskService {
     } catch (error) {
       console.error('TaskService: Erro ao deletar tarefa:', error);
       throw error;
+    }
+  }
+
+  // Função utilitária estática para validação de URL
+  static validateMediaUrlStatic(url: string): boolean {
+    if (!url) return false;
+    try {
+      new URL(url);
+      return true;
+    } catch {
+      return false;
     }
   }
 
@@ -386,7 +411,47 @@ class TaskService {
       throw error;
     }
   }
+
+  static subscribeToTasksBySite(siteId: string, callback: (tasks: Task[]) => void) {
+    const tasksQuery = query(
+      collection(db, 'tasks'),
+      where('siteId', '==', siteId),
+      orderBy('createdAt', 'desc')
+    );
+    
+    return onSnapshot(tasksQuery, (snapshot) => {
+      const tasks = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+      } as Task));
+      callback(tasks);
+    });
+  }
+
+  async addComment(taskId: string, comment: Comment): Promise<void> {
+    try {
+      const taskRef = doc(db, 'tasks', taskId);
+      const taskDoc = await getDoc(taskRef);
+      
+      if (!taskDoc.exists()) {
+        throw new Error('Tarefa não encontrada');
+      }
+      
+      const taskData = taskDoc.data();
+      const currentComments = taskData.comments || [];
+      const updatedComments = [...currentComments, comment];
+      
+      await updateDoc(taskRef, {
+        comments: updatedComments,
+        updatedAt: serverTimestamp(),
+      });
+    } catch (error) {
+      console.error('Erro ao adicionar comentário:', error);
+      throw error;
+    }
+  }
 }
 
 const taskService = TaskService.getInstance();
-export default taskService;
+export { taskService };
+export default TaskService;

@@ -13,6 +13,8 @@ export default function AdminLayout() {
         },
       }}
     >
+      <Stack.Screen name="index" />
+      <Stack.Screen name="chat" />
       <Stack.Screen name="sites" />
       <Stack.Screen name="sites/create" />
       <Stack.Screen name="sites/edit" />
@@ -21,6 +23,10 @@ export default function AdminLayout() {
       <Stack.Screen name="workers/invite-admin" />
       <Stack.Screen name="workers/admins" />
       <Stack.Screen name="stats" />
+      <Stack.Screen name="notifications" />
+      <Stack.Screen name="settings" />
+      <Stack.Screen name="privacy" />
+      <Stack.Screen name="support" />
     </Stack>
   );
 } 

@@ -22,6 +22,7 @@ import {
   Shield,
   Loader,
   RefreshCw,
+  MessageCircle,
 } from 'lucide-react-native';
 import { AuthService, User } from '@/services/AuthService';
 import { AdminService } from '@/services/AdminService';
@@ -240,6 +241,13 @@ export default function AdminScreen() {
             icon={<UserPlus size={24} color={colors.warning} />}
             onPress={() => router.push('/admin/workers/invite')}
             color={colors.warning}
+          />
+          <AdminCard
+            title="Chat"
+            subtitle="Converse com outros administradores"
+            icon={<MessageCircle size={24} color={colors.primary} />}
+            onPress={() => router.push('/admin/chat')}
+            color={colors.primary}
           />
         </View>
 

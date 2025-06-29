@@ -10,14 +10,15 @@ import {
   Alert,
   Image,
   Platform,
-  Dimensions,
 } from 'react-native';
-import { X, Camera, User, Calendar, Flag, MapPin, ChevronDown, ImagePlus, Video, Trash2 } from 'lucide-react-native';
+import { X, User, Calendar, Flag, MapPin, ImagePlus, Video, Trash2, Send, MessageCircle } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
-import type { Task } from '@/services/TaskService';
-import { AuthService } from '@/services/AuthService';
+import type { Task } from '../services/TaskService';
+import { TaskService } from '../services/TaskService';
+import { AuthService } from '../services/AuthService';
 import { onSnapshot, collection, query, where } from 'firebase/firestore';
-import { db } from '@/config/firebase';
+import { db } from '../config/firebase';
+import { uploadImageAsync } from '../services/PhotoService';
 
 interface TaskModalProps {
   visible: boolean;
@@ -26,11 +27,12 @@ interface TaskModalProps {
   onSave: (task: Partial<Task>) => void;
   onClose: () => void;
   detailsMode?: boolean;
+  onEditMode?: () => void;
 }
 
 const areas = ['Canteiro', 'Almoxarifado', 'Instalações', 'Área Externa', 'Escritório', 'Depósito'];
 
-export function TaskModal({ visible, task, userRole, onSave, onClose, detailsMode = false }: TaskModalProps) {
+export function TaskModal({ visible, task, userRole, onSave, onClose, detailsMode = false, onEditMode }: TaskModalProps) {
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -46,6 +48,10 @@ export function TaskModal({ visible, task, userRole, onSave, onClose, detailsMod
   const [showAreaPicker, setShowAreaPicker] = useState(false);
   const [fullscreenMedia, setFullscreenMedia] = useState<{ type: 'photo' | 'video'; url: string } | null>(null);
   const [fullscreenVisible, setFullscreenVisible] = useState(false);
+  
+  // Estados para comentários
+  const [commentText, setCommentText] = useState('');
+  const [isAddingComment, setIsAddingComment] = useState(false);
 
   useEffect(() => {
     if (task) {
@@ -77,6 +83,14 @@ export function TaskModal({ visible, task, userRole, onSave, onClose, detailsMod
       });
     }
   }, [task, visible]);
+
+  // Atualizar comentários quando a tarefa mudar
+  useEffect(() => {
+    if (task && task.comments) {
+      // Forçar re-render quando os comentários mudarem
+      setFormData(prev => ({ ...prev }));
+    }
+  }, [task?.comments]);
 
   const handleSave = () => {
     if (!formData.title.trim()) {
@@ -173,44 +187,68 @@ export function TaskModal({ visible, task, userRole, onSave, onClose, detailsMod
         input.type = 'file';
         input.accept = 'image/*';
         input.multiple = true;
-        
-        input.onchange = (e: Event) => {
-          const files = (e.target as HTMLInputElement).files;
-          if (files) {
-            const newPhotos = Array.from(files).map(file => URL.createObjectURL(file));
-            setFormData(prev => ({
-              ...prev,
-              photos: [...prev.photos, ...newPhotos]
-            }));
+        input.onchange = async (e: Event) => {
+          try {
+            const files = (e.target as HTMLInputElement).files;
+            if (files) {
+              const uploadedUrls: string[] = [];
+              
+              for (const file of Array.from(files)) {
+                try {
+                  console.log('🔄 Processando arquivo:', file.name);
+                  
+                  // Em desenvolvimento web, usar URLs locais temporárias
+                  // para evitar problemas de CORS com Firebase Storage
+                  const localUrl = URL.createObjectURL(file);
+                  console.log('✅ URL local criada:', localUrl);
+                  
+                  uploadedUrls.push(localUrl);
+                } catch (uploadError) {
+                  console.error('❌ Erro no processamento do arquivo:', file.name, uploadError);
+                  Alert.alert('Erro', `Não foi possível processar ${file.name}. Tente novamente.`);
+                }
+              }
+              
+              if (uploadedUrls.length > 0) {
+                setFormData(prev => ({
+                  ...prev,
+                  photos: [...prev.photos, ...uploadedUrls]
+                }));
+                console.log('✅ Imagens adicionadas:', uploadedUrls.length);
+              }
+            }
+          } catch (error) {
+            console.error('❌ Erro ao processar arquivos:', error);
+            Alert.alert('Erro', 'Não foi possível processar as imagens selecionadas.');
           }
         };
-        
         input.click();
         return;
       }
-
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') {
         Alert.alert('Permissão necessária', 'Precisamos de permissão para acessar suas fotos.');
         return;
       }
-
+      
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         aspect: [4, 3],
         quality: 0.8,
       });
-
+      
       if (!result.canceled && result.assets[0].uri) {
+        const user = await AuthService.getCurrentUser();
+        const url = await uploadImageAsync(result.assets[0].uri, user?.id || 'anon');
         setFormData(prev => ({
           ...prev,
-          photos: [...prev.photos, result.assets[0].uri]
+          photos: [...prev.photos, url]
         }));
       }
     } catch (error) {
-      console.error('Erro ao selecionar imagem:', error);
+      console.error('❌ Erro ao selecionar imagem:', error);
       Alert.alert('Erro', 'Não foi possível selecionar a imagem.');
     }
   };
@@ -383,6 +421,69 @@ export function TaskModal({ visible, task, userRole, onSave, onClose, detailsMod
     }
   };
 
+  // Função para adicionar comentário
+  const handleAddComment = async () => {
+    if (!commentText.trim() || !task) return;
+    
+    try {
+      setIsAddingComment(true);
+      const currentUser = await AuthService.getCurrentUser();
+      if (!currentUser) {
+        Alert.alert('Erro', 'Usuário não encontrado.');
+        return;
+      }
+
+      const comment = {
+        id: Date.now().toString(),
+        text: commentText.trim(),
+        userId: currentUser.id,
+        userName: currentUser.name,
+        timestamp: new Date().toISOString(),
+      };
+
+      // Adicionar comentário à tarefa usando TaskService
+      const taskServiceInstance = TaskService.getInstance();
+      await taskServiceInstance.addComment(task.id, comment);
+      
+      // Limpar campo de comentário
+      setCommentText('');
+      
+      // Atualizar a tarefa local para refletir o novo comentário
+      if (task) {
+        const updatedComments = [...(task.comments || []), comment];
+        task.comments = updatedComments;
+        
+        // Forçar re-render do componente
+        setFormData(prev => ({ ...prev }));
+      }
+      
+      // Mostrar feedback visual
+      Alert.alert('Sucesso', 'Comentário adicionado com sucesso!');
+      
+    } catch (error) {
+      console.error('Erro ao adicionar comentário:', error);
+      Alert.alert('Erro', 'Não foi possível adicionar o comentário.');
+    } finally {
+      setIsAddingComment(false);
+    }
+  };
+
+  // Função para formatar data do comentário
+  const formatCommentDate = (timestamp: string) => {
+    try {
+      const date = new Date(timestamp);
+      return date.toLocaleDateString('pt-BR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch (error) {
+      return 'Data inválida';
+    }
+  };
+
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
       <View style={styles.container}>
@@ -512,6 +613,75 @@ export function TaskModal({ visible, task, userRole, onSave, onClose, detailsMod
                       <Text style={styles.infoValue}>{getPriorityText(formData.priority)}</Text>
                     </View>
                   </View>
+                </View>
+              </View>
+
+              {/* Card de Comentários */}
+              <View style={styles.commentsCard}>
+                <View style={styles.commentsHeader}>
+                  <View style={styles.commentsHeaderContent}>
+                    <MessageCircle size={20} color="#6B7280" />
+                    <Text style={styles.commentsTitle}>Comentários</Text>
+                    <Text style={styles.commentsCount}>
+                      ({task?.comments?.length || 0})
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Lista de Comentários */}
+                <View style={styles.commentsList}>
+                  {task?.comments && task.comments.length > 0 ? (
+                    task.comments.map((comment) => (
+                      <View key={comment.id} style={styles.commentItem}>
+                        <View style={styles.commentHeader}>
+                          <Text style={styles.commentUserName}>{comment.userName}</Text>
+                          <Text style={styles.commentDate}>
+                            {formatCommentDate(comment.timestamp)}
+                          </Text>
+                        </View>
+                        <Text style={styles.commentText}>{comment.text}</Text>
+                      </View>
+                    ))
+                  ) : (
+                    <View style={styles.noCommentsContainer}>
+                      <MessageCircle size={24} color="#9CA3AF" />
+                      <Text style={styles.noCommentsText}>
+                        Nenhum comentário ainda. Seja o primeiro a comentar!
+                      </Text>
+                    </View>
+                  )}
+                </View>
+
+                {/* Campo para adicionar comentário */}
+                <View style={styles.addCommentContainer}>
+                  <View style={styles.commentInputRow}>
+                    <TextInput
+                      style={styles.commentInput}
+                      placeholder="Adicionar comentário..."
+                      placeholderTextColor="#9CA3AF"
+                      value={commentText}
+                      onChangeText={setCommentText}
+                      multiline
+                      maxLength={500}
+                    />
+                    <TouchableOpacity
+                      style={[
+                        styles.sendCommentButton,
+                        { backgroundColor: commentText.trim() ? '#F97316' : '#E5E7EB' }
+                      ]}
+                      onPress={handleAddComment}
+                      disabled={!commentText.trim() || isAddingComment}
+                    >
+                      {isAddingComment ? (
+                        <Text style={styles.sendCommentButtonText}>...</Text>
+                      ) : (
+                        <Send size={16} color={commentText.trim() ? '#FFFFFF' : '#9CA3AF'} />
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                  <Text style={styles.commentHint}>
+                    Pressione Enter para enviar
+                  </Text>
                 </View>
               </View>
             </View>
@@ -799,8 +969,11 @@ export function TaskModal({ visible, task, userRole, onSave, onClose, detailsMod
           <TouchableOpacity 
             style={styles.saveButton} 
             onPress={() => {
-              // Simplesmente fechar o modal de detalhes
-              onClose();
+              // Mudar do modo de detalhes para o modo de edição
+              // Isso será tratado pelo componente pai através de uma nova prop
+              if (onEditMode) {
+                onEditMode();
+              }
             }}
           >
             <Text style={styles.saveButtonText}>Editar Tarefa</Text>
@@ -1650,5 +1823,121 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: 'Inter-Medium',
     color: '#6B7280',
+  },
+  commentsCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 24,
+    marginBottom: 20,
+    boxShadow: '0px 2px 8px rgba(0,0,0,0.1)',
+    elevation: 4,
+  },
+  commentsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  commentsHeaderContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  commentsTitle: {
+    fontSize: 18,
+    fontFamily: 'Inter-SemiBold',
+    color: '#111827',
+  },
+  commentsCount: {
+    fontSize: 14,
+    fontFamily: 'Inter-Medium',
+    color: '#6B7280',
+  },
+  commentsList: {
+    marginBottom: 16,
+  },
+  commentItem: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+  },
+  commentHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  commentUserName: {
+    fontSize: 14,
+    fontFamily: 'Inter-Medium',
+    color: '#111827',
+  },
+  commentDate: {
+    fontSize: 12,
+    fontFamily: 'Inter-Regular',
+    color: '#6B7280',
+  },
+  commentText: {
+    fontSize: 16,
+    fontFamily: 'Inter-Regular',
+    color: '#111827',
+    lineHeight: 22,
+  },
+  noCommentsContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 32,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+  },
+  noCommentsText: {
+    fontSize: 16,
+    fontFamily: 'Inter-Medium',
+    color: '#6B7280',
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  addCommentContainer: {
+    marginTop: 16,
+  },
+  commentInputRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 8,
+  },
+  commentInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    fontFamily: 'Inter-Regular',
+    color: '#374151',
+    backgroundColor: '#FFFFFF',
+    minHeight: 44,
+    maxHeight: 120,
+    textAlignVertical: 'top',
+  },
+  sendCommentButton: {
+    padding: 12,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    minWidth: 44,
+    minHeight: 44,
+  },
+  sendCommentButtonText: {
+    fontSize: 16,
+    fontFamily: 'Inter-Medium',
+    color: '#FFFFFF',
+  },
+  commentHint: {
+    fontSize: 12,
+    fontFamily: 'Inter-Regular',
+    color: '#6B7280',
+    marginTop: 8,
+    textAlign: 'center',
   },
 });

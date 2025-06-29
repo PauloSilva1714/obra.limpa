@@ -134,7 +134,6 @@ export default function RegisterScreen() {
         phone: formData.phone.trim(),
         company: formData.company.trim(),
         siteName: formData.siteName.trim(),
-        siteAddress: formData.siteAddress.trim(),
         inviteId: formData.inviteCode.trim()
       });
 

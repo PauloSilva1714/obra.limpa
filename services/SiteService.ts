@@ -1,11 +1,6 @@
-import { AuthService } from '../services/AuthService';
+import { AuthService, Site } from './AuthService';
 
-
-interface SiteWithStats {
-  id: string;
-  name: string;
-  address: string;
-  status: 'active' | 'inactive';
+export interface SiteWithStats extends Site {
   tasksCount: number;
   completedTasks: number;
 }
@@ -33,11 +28,10 @@ class SiteManagementService {
     try {
       const sites = await AuthService.getUserSites();
 
-      return sites.map((site: { id: string; name: string; address: string }) => {
+      return sites.map((site: Site) => {
         const stats = this.demoSiteStats.find((s) => s.id === site.id);
         return {
           ...site,
-          status: 'active' as const,
           tasksCount: stats?.tasksCount || 0,
           completedTasks: stats?.completedTasks || 0,
         };

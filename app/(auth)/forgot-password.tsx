@@ -280,8 +280,6 @@ const styles = StyleSheet.create({
     marginBottom: 32,
     borderWidth: 3,
     borderColor: 'rgba(255, 255, 255, 0.3)',
-    boxShadow: '0px 4px 8px rgba(0, 0, 0, 0.3)',
-    elevation: 8,
   },
   title: {
     fontSize: 48,
@@ -289,11 +287,8 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     textAlign: 'center',
     marginBottom: 16,
-    textShadow: '0px 3px 10px rgba(0,0,0,0.5)',
     fontWeight: '900',
     letterSpacing: 2,
-    includeFontPadding: false,
-    textAlignVertical: 'center',
   },
   subtitle: {
     fontSize: 20,
@@ -301,7 +296,6 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.9)',
     textAlign: 'center',
     letterSpacing: 0.8,
-    textShadow: '0px 1px 4px rgba(0,0,0,0.3)',
   },
   titleFallback: {
     fontSize: 32,
@@ -319,8 +313,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 32,
     borderTopRightRadius: 32,
-    boxShadow: '0px -4px 12px rgba(0, 0, 0, 0.1)',
-    elevation: 8,
     zIndex: 2,
   },
   form: {
@@ -374,8 +366,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 16,
-    boxShadow: '0px 4px 8px rgba(59, 130, 246, 0.3)',
-    elevation: 4,
   },
   sendButtonText: {
     color: '#FFFFFF',
@@ -385,8 +375,6 @@ const styles = StyleSheet.create({
   },
   buttonDisabled: {
     backgroundColor: '#9CA3AF',
-    boxShadow: 'none',
-    elevation: 0,
   },
   backButton: {
     flexDirection: 'row',
@@ -446,8 +434,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 16,
-    boxShadow: '0px 4px 8px rgba(59, 130, 246, 0.3)',
-    elevation: 4,
   },
   backToLoginText: {
     color: '#FFFFFF',

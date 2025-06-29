@@ -1,8 +1,5 @@
 // Configuração específica para Firebase Web
 import { Platform } from 'react-native';
-import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getAuth, connectAuthEmulator } from 'firebase/auth';
-import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore';
 
 // Configuração para resolver problemas do Firebase Web
 if (Platform.OS === 'web') {
@@ -40,47 +37,38 @@ if (Platform.OS === 'web') {
         }
       }
     });
-  }
-}
-
-const firebaseConfig = {
-  apiKey: "AIzaSyDHJm219NVmB5KdQcLYRgOrp_coC_KbycQ",
-  authDomain: "bralimpa2.firebaseapp.com",
-  projectId: "bralimpa2",
-  storageBucket: "bralimpa2.firebasestorage.app",
-  messagingSenderId: "127747660506",
-  appId: "1:127747660506:web:b1d89516a0bc22698de3e3"
-};
-
-// Initialize Firebase
-const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
-
-// Initialize Firestore
-const db = getFirestore(app);
-
-// Initialize Auth
-const auth = getAuth(app);
-
-// Configurações específicas para web
-if (typeof window !== 'undefined') {
-  // Configurações para evitar problemas de CORS
-  const originalFetch = window.fetch;
-  window.fetch = function(url, options = {}) {
-    // Adicionar headers para evitar problemas de CORS
-    const newOptions = {
-      ...options,
-      headers: {
-        'Content-Type': 'application/json',
-        ...options.headers,
-      },
-      mode: 'cors',
-      credentials: 'same-origin'
+    
+    // Configurações para evitar problemas de CORS
+    const originalFetch = window.fetch;
+    window.fetch = function(url, options = {}) {
+      // Adicionar headers para evitar problemas de CORS
+      const newOptions = {
+        ...options,
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          ...options.headers,
+        },
+        mode: 'cors',
+        credentials: 'same-origin'
+      };
+      
+      // Log para debug
+      if (url.toString().includes('firestore.googleapis.com')) {
+        console.log('🔍 Firebase request:', { url, options: newOptions });
+      }
+      
+      return originalFetch(url, newOptions);
     };
     
-    return originalFetch(url, newOptions);
-  };
+    // Configuração adicional para melhorar a conectividade
+    if (window.navigator && window.navigator.serviceWorker) {
+      // Registrar service worker para melhorar cache
+      window.navigator.serviceWorker.register('/firebase-messaging-sw.js')
+        .then(() => console.log('Service Worker registrado'))
+        .catch(() => console.log('Service Worker não registrado (esperado)'));
+    }
+  }
 }
-
-export { app, db, auth };
 
 export default Platform; 

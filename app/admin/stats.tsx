@@ -9,7 +9,7 @@ import {
 import { router } from 'expo-router';
 import { ArrowLeft, Users, ClipboardCheck, Clock, AlertCircle } from 'lucide-react-native';
 import { AuthService } from '@/services/AuthService';
-import taskService from '@/services/TaskService';
+import TaskService from '@/services/TaskService';
 
 // Define Task type with status property
 type Task = {
@@ -36,35 +36,46 @@ export default function StatsScreen() {
     inProgressTasks: 0,
   });
   const [loading, setLoading] = useState(true);
+  const [siteId, setSiteId] = useState<string | null>(null);
 
   useEffect(() => {
-    loadStats();
+    AuthService.getCurrentSite().then(site => {
+      console.log('Admin Stats - Site selecionado:', site?.id);
+      setSiteId(site?.id ?? null);
+    });
   }, []);
 
-  const loadStats = async () => {
-    try {
-      setLoading(true);
-      const workers = await AuthService.getInstance().getWorkers();
-      const tasks = await taskService.getTasks();
-
+  useEffect(() => {
+    if (!siteId) return;
+    setLoading(true);
+    const unsubscribeTasks = TaskService.subscribeToTasksBySite(siteId, (tasks) => {
+      console.log('Admin Stats - Atualização de tarefas recebida:', tasks);
       const completedTasks = tasks.filter((task: Task) => task.status === 'completed');
       const pendingTasks = tasks.filter((task: Task) => task.status === 'pending');
       const inProgressTasks = tasks.filter((task: Task) => task.status === 'in_progress');
-
-      setStats({
-        totalWorkers: workers.length,
-        activeWorkers: workers.filter(worker => worker.status === 'active').length,
+      setStats(prev => ({
+        ...prev,
         totalTasks: tasks.length,
         completedTasks: completedTasks.length,
         pendingTasks: pendingTasks.length,
         inProgressTasks: inProgressTasks.length,
-      });
-    } catch (error) {
-      console.error('Erro ao carregar estatísticas:', error);
-    } finally {
+      }));
       setLoading(false);
-    }
-  };
+    });
+    // Assinar workers em tempo real (se houver método, senão manter getWorkers)
+    // Exemplo:
+    // const unsubscribeWorkers = AuthService.subscribeToWorkers(siteId, (workers) => {
+    //   setStats(prev => ({
+    //     ...prev,
+    //     totalWorkers: workers.length,
+    //     activeWorkers: workers.filter(w => w.status === 'active').length,
+    //   }));
+    // });
+    return () => {
+      unsubscribeTasks && unsubscribeTasks();
+      // unsubscribeWorkers && unsubscribeWorkers();
+    };
+  }, [siteId]);
 
   const StatCard = ({ icon: Icon, value, title }: { icon: any; value: number; title: string }) => (
     <View style={styles.statCard}>

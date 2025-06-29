@@ -73,7 +73,7 @@ Edite o arquivo `config/google-places.ts`:
 
 ```typescript
 export const GOOGLE_PLACES_CONFIG = {
-  API_KEY: 'SUA_CHAVE_AQUI', // Substitua pela sua chave real
+  API_KEY: 'AIzaSyBer6x1O4RAlrkHw8HYhh-lRgrbKlnocEA', // Substitua pela sua chave real
   // ... resto da configuração
 };
 ```

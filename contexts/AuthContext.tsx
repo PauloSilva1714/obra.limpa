@@ -1,15 +1,8 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { AuthService } from '@/services/AuthService';
+import { AuthService, User as AuthUser } from '@/services/AuthService';
 
-interface User {
-  id: string;
-  name: string;
-  email: string;
-  role: 'admin' | 'worker';
-  company: string;
-  phone: string;
-  sites: string[];
-}
+// Use o tipo User do AuthService para garantir compatibilidade!
+export type User = AuthUser;
 
 interface AuthContextData {
   user: User | null;
@@ -43,7 +36,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   async function signIn(email: string, password: string) {
     try {
-      const success = await AuthService.signIn(email, password);
+      const success = await AuthService.login(email, password); // Corrigido!
       if (success) {
         await loadUser();
       }
@@ -56,7 +49,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   async function signOut() {
     try {
-      await AuthService.signOut();
+      await AuthService.logout(); // Corrigido!
       setUser(null);
     } catch (error) {
       console.error('Erro ao fazer logout:', error);

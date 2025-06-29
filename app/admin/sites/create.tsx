@@ -11,15 +11,18 @@ import {
 import { router } from 'expo-router';
 import { ArrowLeft } from 'lucide-react-native';
 import { AuthService } from '@/services/AuthService';
+import AddressSearch from '@/components/AddressSearch';
 
 export default function CreateSiteScreen() {
   const [name, setName] = useState('');
   const [address, setAddress] = useState('');
+  const [latitude, setLatitude] = useState<number | null>(null);
+  const [longitude, setLongitude] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
 
   const handleCreateSite = async () => {
-    if (!name.trim() || !address.trim()) {
-      Alert.alert('Erro', 'Por favor, preencha todos os campos');
+    if (!name.trim() || !address.trim() || latitude === null || longitude === null) {
+      Alert.alert('Erro', 'Por favor, preencha todos os campos e selecione um endereço válido');
       return;
     }
 
@@ -28,6 +31,8 @@ export default function CreateSiteScreen() {
       await AuthService.getInstance().createSite({
         name: name.trim(),
         address: address.trim(),
+        latitude,
+        longitude,
         status: 'active',
       });
       Alert.alert('Sucesso', 'Obra criada com sucesso');
@@ -67,15 +72,15 @@ export default function CreateSiteScreen() {
 
         <View style={styles.inputGroup}>
           <Text style={styles.label}>Endereço</Text>
-          <TextInput
-            style={[styles.input, styles.textArea]}
+          <AddressSearch
             value={address}
             onChangeText={setAddress}
+            onAddressSelect={(addr, lat, lng) => {
+              setAddress(addr);
+              setLatitude(lat || null);
+              setLongitude(lng || null);
+            }}
             placeholder="Digite o endereço da obra"
-            placeholderTextColor="#999"
-            multiline
-            numberOfLines={3}
-            textAlignVertical="top"
           />
         </View>
 

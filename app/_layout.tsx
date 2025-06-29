@@ -1,7 +1,6 @@
 import '@/config/console';
 import '@/config/react-native-web';
 import '@/config/expo-router';
-import '@/config/firebase-web';
 import { useEffect, useState } from 'react';
 import { Stack, Slot } from 'expo-router';
 import Head from 'expo-router/head';

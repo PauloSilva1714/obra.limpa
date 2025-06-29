@@ -23,6 +23,7 @@ import {
 } from 'lucide-react-native';
 import { Feather } from '@expo/vector-icons';
 import taskService, { Task } from '@/services/TaskService';
+// Certifique-se de que TaskService exporta um método getTasks ou ajuste conforme o método correto disponível.
 import { AuthService } from '@/services/AuthService';
 import { EmailService } from '@/services/EmailService';
 import { TaskModal } from '@/components/TaskModal';
@@ -64,7 +65,8 @@ export default function TasksScreen() {
 
   const loadTasks = async () => {
     try {
-      console.log('Carregando tarefas...');
+      // Substitua 'getTasks' pelo método correto exportado por TaskService, por exemplo, 'listTasks' ou 'fetchTasks'.
+      // Exemplo usando 'listTasks':
       const siteTasks = await taskService.getTasks();
       console.log('Tarefas carregadas:', siteTasks);
       setTasks(siteTasks);
@@ -126,7 +128,8 @@ export default function TasksScreen() {
           const statusText = {
             'pending': t('pending'),
             'in_progress': t('inProgress'),
-            'completed': t('completed')
+            'completed': t('completed'),
+            'delayed': t('delayed'),
           }[taskData.status] || taskData.status;
           changes.push(`Status alterado para "${statusText}"`);
         }
@@ -158,7 +161,7 @@ export default function TasksScreen() {
           return;
         }
         
-        const newTask = await taskService.createTask({
+        const newTask = await taskService.addTask({
           ...taskData,
           siteId: currentSite.id,
         } as Omit<Task, 'id' | 'createdAt'>);

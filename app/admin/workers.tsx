@@ -33,10 +33,32 @@ export default function WorkersScreen() {
   const [workers, setWorkers] = useState<Worker[]>([]);
   const [invites, setInvites] = useState<Invite[]>([]);
   const [loading, setLoading] = useState(true);
+  const [siteId, setSiteId] = useState<string | null>(null);
 
   useEffect(() => {
-    loadData();
+    AuthService.getCurrentSite().then(site => {
+      console.log('Admin Workers - Site selecionado:', site?.id);
+      setSiteId(site?.id ?? null);
+    });
   }, []);
+
+  useEffect(() => {
+    if (!siteId) return;
+    setLoading(true);
+    const unsubscribeWorkers = AuthService.subscribeToWorkers(siteId, (workersData) => {
+      console.log('Admin Workers - Atualização de workers recebida:', workersData);
+      setWorkers(workersData);
+      setLoading(false);
+    });
+    const unsubscribeInvites = AuthService.subscribeToInvites(siteId, (invitesData) => {
+      console.log('Admin Workers - Atualização de invites recebida:', invitesData);
+      setInvites(invitesData);
+    });
+    return () => {
+      unsubscribeWorkers && unsubscribeWorkers();
+      unsubscribeInvites && unsubscribeInvites();
+    };
+  }, [siteId]);
 
   const loadData = async () => {
     try {

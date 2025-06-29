@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { ArrowLeft, MapPin, Trash2 } from 'lucide-react-native';
 import { AuthService } from '@/services/AuthService';
+import TaskService from '@/services/TaskService';
 
 interface Site {
   id: string;
@@ -19,10 +20,19 @@ export default function EditSiteScreen() {
   const [address, setAddress] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [tasks, setTasks] = useState([]);
 
   useEffect(() => {
     loadSite();
   }, [id]);
+
+  useEffect(() => {
+    if (!site) return;
+    const unsubscribe = TaskService.subscribeToTasksBySite(site.id, (tasks) => {
+      setTasks(tasks);
+    });
+    return () => unsubscribe && unsubscribe();
+  }, [site]);
 
   const loadSite = async () => {
     try {
@@ -152,6 +162,14 @@ export default function EditSiteScreen() {
             />
           </View>
         </View>
+
+        {site && (
+          <View style={{ marginTop: 16, alignItems: 'center' }}>
+            <Text style={{ color: '#374151', fontSize: 16 }}>
+              Tarefas relacionadas a esta obra: <Text style={{ fontWeight: 'bold' }}>{tasks.length}</Text>
+            </Text>
+          </View>
+        )}
 
         <TouchableOpacity
           style={[styles.button, saving && styles.buttonDisabled]}

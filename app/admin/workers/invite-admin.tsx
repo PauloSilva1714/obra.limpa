@@ -47,6 +47,8 @@ export default function InviteAdminScreen() {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [successEmail, setSuccessEmail] = useState('');
+  const [emailError, setEmailError] = useState('');
+  const [isValidEmail, setIsValidEmail] = useState(false);
 
   useEffect(() => {
     loadAdminInvites();
@@ -74,14 +76,34 @@ export default function InviteAdminScreen() {
     }
   };
 
+  const validateEmail = (email: string) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const isValid = emailRegex.test(email.trim());
+    setIsValidEmail(isValid);
+    
+    if (email.trim() === '') {
+      setEmailError('');
+    } else if (!isValid) {
+      setEmailError('Por favor, insira um email válido');
+    } else {
+      setEmailError('');
+    }
+    
+    return isValid;
+  };
+
+  const handleEmailChange = (text: string) => {
+    setEmail(text);
+    validateEmail(text);
+  };
+
   const handleInvite = async () => {
     if (!email.trim()) {
       Alert.alert('Erro', 'Por favor, insira um email válido');
       return;
     }
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email.trim())) {
+    if (!isValidEmail) {
       Alert.alert('Erro', 'Por favor, insira um email válido');
       return;
     }
@@ -102,10 +124,56 @@ export default function InviteAdminScreen() {
       setShowSuccessModal(true);
       
       setEmail('');
+      setEmailError('');
+      setIsValidEmail(false);
       await loadAdminInvites();
     } catch (error: any) {
       console.error('Erro ao enviar convite:', error);
       Alert.alert('Erro', error.message || 'Erro ao enviar convite');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDiagnose = async () => {
+    if (!email.trim()) {
+      Alert.alert('Erro', 'Por favor, insira um email para diagnosticar');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      console.log('🔍 Iniciando diagnóstico para:', email.trim());
+      const result = await AuthService.diagnoseInviteProblem(email.trim());
+      
+      let message = '🔍 **DIAGNÓSTICO COMPLETO**\n\n';
+      
+      if (result.success) {
+        message += '✅ **TUDO OK!** O envio de convite deve funcionar.\n\n';
+      } else {
+        message += '❌ **PROBLEMAS ENCONTRADOS:**\n\n';
+        result.issues.forEach((issue, index) => {
+          message += `${index + 1}. ${issue}\n`;
+        });
+        message += '\n';
+      }
+      
+      message += '📋 **DETALHES:**\n';
+      message += `• Usuário: ${result.details.currentUser?.email || 'N/A'}\n`;
+      message += `• Role: ${result.details.currentUser?.role || 'N/A'}\n`;
+      message += `• Site: ${result.details.currentSite?.name || 'N/A'}\n`;
+      message += `• Convites existentes: ${result.details.existingInvites || 0}\n`;
+      message += `• Email já é usuário: ${result.details.existingUser ? 'Sim' : 'Não'}\n`;
+      
+      if (result.details.emailResult) {
+        message += `• EmailService: ${result.details.emailResult.success ? 'OK' : 'Falhou'}\n`;
+      }
+      
+      Alert.alert('Diagnóstico', message);
+      
+    } catch (error: any) {
+      console.error('Erro no diagnóstico:', error);
+      Alert.alert('Erro', 'Erro ao executar diagnóstico: ' + error.message);
     } finally {
       setLoading(false);
     }
@@ -338,24 +406,38 @@ export default function InviteAdminScreen() {
             Convide outros administradores para gerenciar esta obra junto com você.
           </Text>
 
-          <View style={[styles.inputContainer, { borderColor: colors.border, backgroundColor: colors.surface }]}>
-            <Mail size={20} color={colors.textMuted} style={styles.inputIcon} />
+          <View style={[styles.inputContainer, { 
+            borderColor: emailError ? '#EF4444' : isValidEmail && email.trim() ? '#10B981' : colors.border, 
+            backgroundColor: colors.surface 
+          }]}>
+            <Mail size={20} color={emailError ? '#EF4444' : isValidEmail && email.trim() ? '#10B981' : colors.textMuted} style={styles.inputIcon} />
             <TextInput
               style={[styles.input, { color: colors.text }]}
               placeholder="E-mail do administrador"
               value={email}
-              onChangeText={setEmail}
+              onChangeText={handleEmailChange}
               keyboardType="email-address"
               autoCapitalize="none"
               placeholderTextColor={colors.textMuted}
             />
+            {isValidEmail && email.trim() && (
+              <Ionicons name="checkmark-circle" size={20} color="#10B981" style={styles.validIcon} />
+            )}
           </View>
+          
+          {emailError ? (
+            <Text style={[styles.errorText, { color: '#EF4444' }]}>{emailError}</Text>
+          ) : null}
 
           <View style={styles.buttonContainer}>
             <TouchableOpacity
-              style={[styles.button, styles.primaryButton]}
+              style={[
+                styles.button, 
+                styles.primaryButton,
+                { opacity: !isValidEmail || loading ? 0.6 : 1 }
+              ]}
               onPress={handleInvite}
-              disabled={loading}
+              disabled={loading || !isValidEmail}
             >
               {loading ? (
                 <ActivityIndicator color="white" />
@@ -567,6 +649,9 @@ const styles = StyleSheet.create({
   inputIcon: {
     marginRight: 12,
   },
+  validIcon: {
+    marginLeft: 12,
+  },
   input: {
     flex: 1,
     fontSize: 16,
@@ -639,9 +724,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   cancelButton: {
-    backgroundColor: '#3B82F6',
     borderWidth: 1,
-    borderColor: '#2563EB',
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginTop: 12,
   },
   cancelButtonContent: {
     flexDirection: 'row',
@@ -664,9 +751,11 @@ const styles = StyleSheet.create({
     letterSpacing: 0.3,
   },
   deleteButton: {
-    backgroundColor: '#3B82F6',
     borderWidth: 1,
-    borderColor: '#2563EB',
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginTop: 12,
   },
   deleteButtonContent: {
     flexDirection: 'row',
@@ -783,5 +872,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#EF4444',
     borderWidth: 1,
     borderColor: '#DC2626',
+  },
+  errorText: {
+    fontSize: 14,
+    marginTop: 4,
+    marginBottom: 8,
+    marginLeft: 4,
   },
 }); 

@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
 import { getPlacesApiUrl, getGeocodingApiUrl, isApiKeyConfigured, getApiKey } from '@/config/google-places';
+import { Platform } from 'react-native';
 
 export interface AddressResult {
   id: string;
@@ -74,31 +75,29 @@ class AddressService {
    * Busca endereços usando Google Places Autocomplete API
    */
   async searchAddresses(query: string): Promise<AddressResult[]> {
-    if (!query.trim() || query.length < 3) {
-      return [];
-    }
-
-    // Verificar se a API key está configurada
     if (!isApiKeyConfigured()) {
       console.warn('Google Places API key não configurada, usando dados simulados');
       return this.getMockSearchResults(query);
     }
 
-    try {
-      // Para desenvolvimento web, usar dados simulados para evitar CORS
-      if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
-        console.log('Executando em localhost, usando dados simulados para evitar CORS');
-        return this.getMockSearchResults(query);
-      }
+    if (!query || query.trim().length < 2) {
+      return [];
+    }
 
-      // Tentativa 1: Busca sem restrições
-      let params = {
+    try {
+      console.log('Iniciando busca de endereços para:', query);
+      
+      // Tentativa 1: Busca padrão
+      let params: { input: string; language: string; components: string; types?: string } = {
         input: query,
         language: 'pt-BR',
+        components: 'country:br',
       };
 
       let url = getPlacesApiUrl('autocomplete', params);
       console.log('Tentativa 1 - URL:', url);
+      // @ts-expect-error: window might not be defined in some environments
+            console.log('Tentativa 1 - Usando proxy:', Platform.OS === 'web' && typeof window !== 'undefined' && (typeof __DEV__ !== 'undefined' && __DEV__));
       
       let response = await fetch(url, {
         method: 'GET',
@@ -106,6 +105,9 @@ class AddressService {
           'Accept': 'application/json',
         },
       });
+      
+      console.log('Tentativa 1 - Status da resposta:', response.status);
+      console.log('Tentativa 1 - Headers da resposta:', Object.fromEntries(response.headers.entries()));
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -128,8 +130,9 @@ class AddressService {
       // Tentativa 2: Busca com types específicos
       params = {
         input: query,
-        types: 'geocode',
         language: 'pt-BR',
+        components: 'country:br',
+        types: 'geocode',
       };
 
       url = getPlacesApiUrl('autocomplete', params);
@@ -141,6 +144,8 @@ class AddressService {
           'Accept': 'application/json',
         },
       });
+      
+      console.log('Tentativa 2 - Status da resposta:', response.status);
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -164,6 +169,13 @@ class AddressService {
       return [];
     } catch (error) {
       console.error('Erro ao buscar endereços:', error);
+      console.error('Detalhes do erro:', {
+        message: error instanceof Error ? error.message : 'Erro desconhecido',
+        stack: error instanceof Error ? error.stack : undefined,
+        query,
+        isApiKeyConfigured: isApiKeyConfigured(),
+        apiKey: getApiKey() ? 'Configurada' : 'Não configurada'
+      });
       // Fallback para dados simulados em caso de erro
       return this.getMockSearchResults(query);
     }
@@ -264,9 +276,13 @@ class AddressService {
     }
 
     // Para desenvolvimento web, usar endereço simulado para evitar CORS
-    if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
-      console.log('Executando em localhost, usando endereço simulado para evitar CORS');
-      return `Rua Simulada, 123, Centro, São Paulo - SP`;
+    if (
+      Platform.OS === 'web' &&
+      typeof globalThis !== 'undefined' &&
+      typeof (globalThis as any).window !== 'undefined' &&
+      (globalThis as any).window.location.hostname === 'localhost'
+    ) {
+      console.log('Executando em localhost, usando o proxy para evitar CORS');
     }
 
     try {

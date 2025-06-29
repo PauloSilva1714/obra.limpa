@@ -49,7 +49,14 @@ export class ProgressService {
       console.log('[ProgressService] Total de tarefas encontradas:', querySnapshot.size);
 
       const tasks = querySnapshot.docs.map(doc => {
-        const taskData = doc.data();
+        const taskData = doc.data() as {
+          title?: string;
+          status?: string;
+          area?: string;
+          siteId?: string;
+          updatedAt?: any;
+          createdAt?: any;
+        };
         console.log('[ProgressService] Tarefa encontrada:', {
           id: doc.id,
           title: taskData.title,
@@ -61,7 +68,15 @@ export class ProgressService {
           id: doc.id,
           ...taskData
         };
-      });
+      }) as Array<{
+        id: string;
+        title?: string;
+        status?: string;
+        area?: string;
+        siteId?: string;
+        updatedAt?: any;
+        createdAt?: any;
+      }>;
 
       // Calcular estatísticas gerais
       const totalTasks = tasks.length;

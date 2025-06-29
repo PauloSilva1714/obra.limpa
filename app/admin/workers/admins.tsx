@@ -8,10 +8,11 @@ import {
   Alert,
   SafeAreaView,
 } from 'react-native';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { ArrowLeft, UserPlus, Crown, Mail, Phone, Building2 } from 'lucide-react-native';
 import { AuthService } from '@/services/AuthService';
 import { useTheme } from '@/contexts/ThemeContext';
+import { ConfirmationModal } from '@/components/ConfirmationModal';
 
 interface Admin {
   id: string;
@@ -27,10 +28,21 @@ export default function AdminsScreen() {
   const { colors } = useTheme();
   const [admins, setAdmins] = useState<Admin[]>([]);
   const [loading, setLoading] = useState(true);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [adminToRemove, setAdminToRemove] = useState<{ id: string; name: string } | null>(null);
+  const [removing, setRemoving] = useState(false);
 
   useEffect(() => {
     loadAdmins();
+    AuthService.getCurrentUser().then(user => setCurrentUserId(user?.id || null));
   }, []);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      loadAdmins();
+    }, [])
+  );
 
   const loadAdmins = async () => {
     try {
@@ -50,6 +62,42 @@ export default function AdminsScreen() {
 
   const handleInviteAdmin = () => {
     router.push('/admin/workers/invite-admin');
+  };
+
+  const handleRemoveAdmin = (adminId: string, adminName: string) => {
+    setAdminToRemove({ id: adminId, name: adminName });
+    setShowConfirmModal(true);
+  };
+
+  const confirmRemoveAdmin = async () => {
+    if (!adminToRemove) return;
+    setRemoving(true);
+    try {
+      const currentSite = await AuthService.getCurrentSite();
+      if (!currentSite) throw new Error('Obra não encontrada');
+      // Buscar admin pelo id
+      const adminRef = await AuthService.getInstance().getWorkerById(adminToRemove.id);
+      if (!adminRef) throw new Error('Admin não encontrado');
+      const updatedSites = (adminRef.sites || []).filter((id: string) => id !== currentSite.id);
+      await AuthService.getInstance().updateWorker(adminToRemove.id, {
+        sites: updatedSites,
+        status: updatedSites.length === 0 ? 'inactive' : 'active',
+      });
+      setShowConfirmModal(false);
+      setAdminToRemove(null);
+      Alert.alert('Sucesso', 'Administrador removido com sucesso!');
+      loadAdmins();
+    } catch (error) {
+      console.error('Erro ao remover admin:', error);
+      Alert.alert('Erro', 'Não foi possível remover o administrador.');
+    } finally {
+      setRemoving(false);
+    }
+  };
+
+  const cancelRemoveAdmin = () => {
+    setShowConfirmModal(false);
+    setAdminToRemove(null);
   };
 
   const renderAdminItem = ({ item }: { item: Admin }) => (
@@ -88,6 +136,21 @@ export default function AdminsScreen() {
           </View>
         )}
       </View>
+      {/* Botão de remover admin, exceto para o próprio usuário */}
+      {currentUserId && item.id !== currentUserId && (
+        <TouchableOpacity
+          style={{
+            backgroundColor: '#F87171',
+            padding: 8,
+            borderRadius: 8,
+            marginTop: 12,
+            alignSelf: 'flex-end',
+          }}
+          onPress={() => handleRemoveAdmin(item.id, item.name)}
+        >
+          <Text style={{ color: '#fff', fontWeight: 'bold' }}>Remover</Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
 
@@ -152,6 +215,15 @@ export default function AdminsScreen() {
           />
         )}
       </View>
+      <ConfirmationModal
+        visible={showConfirmModal}
+        title="Remover Administrador"
+        message={adminToRemove ? `Tem certeza que deseja remover o administrador ${adminToRemove.name} desta obra?` : ''}
+        onConfirm={confirmRemoveAdmin}
+        onCancel={cancelRemoveAdmin}
+        confirmText={removing ? 'Removendo...' : 'Remover'}
+        cancelText="Cancelar"
+      />
     </SafeAreaView>
   );
 }

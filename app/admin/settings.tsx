@@ -11,6 +11,7 @@ import {
   Modal,
   TextInput,
   KeyboardAvoidingView,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -39,6 +40,7 @@ import * as Location from 'expo-location';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '@/contexts/ThemeContext';
 import { t, setLanguage } from '@/config/i18n';
+import * as Linking from 'expo-linking';
 
 interface SettingsSection {
   title: string;
@@ -70,6 +72,7 @@ export default function SettingsScreen() {
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [loadingPermission, setLoadingPermission] = useState<string | null>(null);
 
   useEffect(() => {
     checkPermissions();
@@ -139,37 +142,74 @@ export default function SettingsScreen() {
     Alert.alert(t('languageChanged'), t('languageChangedMessage'));
   };
 
+  const openAppSettings = () => {
+    if (Platform.OS === 'ios') {
+      Linking.openURL('app-settings:');
+    } else if (Platform.OS === 'android') {
+      Linking.openSettings();
+    } else {
+      Alert.alert(
+        'Ação não suportada',
+        'No navegador, altere as permissões manualmente nas configurações do seu navegador ou sistema.'
+      );
+    }
+  };
+
   const handleCameraPermission = async () => {
+    setLoadingPermission('camera');
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     setCameraPermission(status === 'granted');
-    Alert.alert(
-      status === 'granted' ? 'Permissão concedida' : 'Permissão negada',
-      status === 'granted' 
-        ? 'Você pode usar a câmera para tirar fotos das tarefas.' 
-        : 'Você pode ativar a permissão nas configurações do dispositivo.'
-    );
+    setLoadingPermission(null);
+    if (status === 'granted') {
+      Alert.alert('Permissão concedida', 'Você pode usar a câmera para tirar fotos das tarefas.');
+    } else {
+      Alert.alert(
+        'Permissão negada',
+        'Permissão negada. Para ativar, acesse as configurações do seu dispositivo.',
+        [
+          { text: 'Cancelar', style: 'cancel' },
+          { text: 'Abrir configurações', onPress: openAppSettings }
+        ]
+      );
+    }
   };
 
   const handleMediaPermission = async () => {
+    setLoadingPermission('media');
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     setMediaPermission(status === 'granted');
-    Alert.alert(
-      status === 'granted' ? 'Permissão concedida' : 'Permissão negada',
-      status === 'granted' 
-        ? 'Você pode acessar a galeria para selecionar fotos.' 
-        : 'Você pode ativar a permissão nas configurações do dispositivo.'
-    );
+    setLoadingPermission(null);
+    if (status === 'granted') {
+      Alert.alert('Permissão concedida', 'Você pode acessar a galeria para selecionar fotos.');
+    } else {
+      Alert.alert(
+        'Permissão negada',
+        'Permissão negada. Para ativar, acesse as configurações do seu dispositivo.',
+        [
+          { text: 'Cancelar', style: 'cancel' },
+          { text: 'Abrir configurações', onPress: openAppSettings }
+        ]
+      );
+    }
   };
 
   const handleLocationPermission = async () => {
+    setLoadingPermission('location');
     const { status } = await Location.requestForegroundPermissionsAsync();
     setLocationPermission(status === 'granted');
-    Alert.alert(
-      status === 'granted' ? 'Permissão concedida' : 'Permissão negada',
-      status === 'granted' 
-        ? 'Você pode usar a localização para marcar locais das tarefas.' 
-        : 'Você pode ativar a permissão nas configurações do dispositivo.'
-    );
+    setLoadingPermission(null);
+    if (status === 'granted') {
+      Alert.alert('Permissão concedida', 'Você pode usar a localização para marcar locais das tarefas.');
+    } else {
+      Alert.alert(
+        'Permissão negada',
+        'Permissão negada. Para ativar, acesse as configurações do seu dispositivo.',
+        [
+          { text: 'Cancelar', style: 'cancel' },
+          { text: 'Abrir configurações', onPress: openAppSettings }
+        ]
+      );
+    }
   };
 
   const handlePasswordChange = async () => {
@@ -221,7 +261,7 @@ export default function SettingsScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              await AuthService.signOut();
+              await AuthService.logout();
               router.replace('/(auth)/login');
             } catch (error) {
               Alert.alert(t('error'), 'Não foi possível sair da conta.');
@@ -360,37 +400,104 @@ export default function SettingsScreen() {
     },
   ];
 
-  const renderSettingsItem = (item: SettingsItem) => (
-    <TouchableOpacity
-      key={item.id}
-      style={[styles.settingsItem, { borderBottomColor: colors.borderLight }]}
-      onPress={item.onPress}
-      disabled={item.type === 'toggle'}
-    >
-      <View style={styles.itemLeft}>
-        <View style={[styles.itemIcon, { backgroundColor: colors.borderLight }]}>{item.icon}</View>
-        <View style={styles.itemContent}>
-          <Text style={[styles.itemTitle, { color: colors.text }]}>{item.title}</Text>
-          {item.subtitle && (
-            <Text style={[styles.itemSubtitle, { color: colors.textMuted }]}>{item.subtitle}</Text>
-          )}
+  const renderSettingsItem = (item: SettingsItem) => {
+    const isPermission = ['camera', 'media', 'location'].includes(item.id);
+    const isLoading = loadingPermission === item.id;
+    let switchValue = false;
+    let onSwitch = undefined;
+    if (isPermission) {
+      if (item.id === 'camera') {
+        switchValue = cameraPermission;
+        onSwitch = (value: boolean) => {
+          if (!cameraPermission) {
+            handleCameraPermission();
+          } else {
+            Alert.alert(
+              'Atenção',
+              'Para revogar a permissão, acesse as configurações do seu dispositivo.'
+            );
+          }
+        };
+      } else if (item.id === 'media') {
+        switchValue = mediaPermission;
+        onSwitch = (value: boolean) => {
+          if (!mediaPermission) {
+            handleMediaPermission();
+          } else {
+            Alert.alert(
+              'Atenção',
+              'Para revogar a permissão, acesse as configurações do seu dispositivo.'
+            );
+          }
+        };
+      } else if (item.id === 'location') {
+        switchValue = locationPermission;
+        onSwitch = (value: boolean) => {
+          if (!locationPermission) {
+            handleLocationPermission();
+          } else {
+            Alert.alert(
+              'Atenção',
+              'Para revogar a permissão, acesse as configurações do seu dispositivo.'
+            );
+          }
+        };
+      }
+    }
+    return (
+      <TouchableOpacity
+        key={item.id}
+        style={[
+          styles.settingsItem,
+          { borderBottomColor: colors.borderLight },
+          isPermission && styles.permissionButton,
+        ]}
+        onPress={item.onPress}
+        activeOpacity={isPermission ? 0.7 : 1}
+        disabled={item.type === 'toggle' || isLoading}
+      >
+        <View style={styles.itemLeft}>
+          <View style={[
+            styles.itemIcon,
+            { backgroundColor: colors.borderLight },
+            isPermission && { borderColor: item.subtitle === t('allowed') ? colors.success : colors.error, borderWidth: 1 }
+          ]}>{item.icon}</View>
+          <View style={styles.itemContent}>
+            <Text style={[styles.itemTitle, { color: colors.text }]}>{item.title}</Text>
+            {item.subtitle && (
+              <Text style={[
+                styles.itemSubtitle,
+                { color: item.subtitle === t('allowed') ? colors.success : item.subtitle === t('denied') ? colors.error : colors.textMuted }
+              ]}>{item.subtitle}</Text>
+            )}
+          </View>
         </View>
-      </View>
-      
-      {item.type === 'toggle' && (
-        <Switch
-          value={item.value as boolean}
-          onValueChange={item.onToggle}
-          trackColor={{ false: colors.border, true: colors.primary }}
-          thumbColor={item.value ? '#FFFFFF' : '#FFFFFF'}
-        />
-      )}
-      
-      {item.type === 'navigation' && (
-        <Text style={[styles.chevron, { color: colors.textMuted }]}>›</Text>
-      )}
-    </TouchableOpacity>
-  );
+        {isPermission && (
+          <Switch
+            value={switchValue}
+            onValueChange={onSwitch}
+            trackColor={{ false: colors.border, true: colors.primary }}
+            thumbColor={switchValue ? '#FFFFFF' : '#FFFFFF'}
+            disabled={isLoading}
+          />
+        )}
+        {isLoading && (
+          <ActivityIndicator size="small" color={colors.primary} style={{ marginLeft: 8 }} />
+        )}
+        {item.type === 'toggle' && !isPermission && (
+          <Switch
+            value={item.value as boolean}
+            onValueChange={item.onToggle}
+            trackColor={{ false: colors.border, true: colors.primary }}
+            thumbColor={item.value ? '#FFFFFF' : '#FFFFFF'}
+          />
+        )}
+        {item.type === 'navigation' && (
+          <Text style={[styles.chevron, { color: colors.textMuted }]}>›</Text>
+        )}
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
@@ -742,5 +849,20 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-SemiBold',
     marginTop: 16,
     marginBottom: 8,
+  },
+  permissionButton: {
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.02)',
+    marginBottom: 2,
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  settingsButton: {
+    marginLeft: 8,
+    padding: 6,
+    borderRadius: 6,
+    backgroundColor: 'rgba(33,150,243,0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 }); 

@@ -3,23 +3,14 @@ import { View, Text, TouchableOpacity, StyleSheet, FlatList, Alert } from 'react
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Building2, ChevronRight, MapPin } from 'lucide-react-native';
-import { AuthService } from '@/services/AuthService';
-import { SiteService } from '@/services/SiteService';
-
-interface Site {
-  id: string;
-  name: string;
-  address: string;
-  status: 'active' | 'inactive';
-  tasksCount: number;
-  completedTasks: number;
-}
+import { AuthService, User } from '../../services/AuthService';
+import { SiteService, SiteWithStats } from '../../services/SiteService';
 
 export default function SiteSelectionScreen() {
-  const [sites, setSites] = useState<Site[]>([]);
+  const [sites, setSites] = useState<SiteWithStats[]>([]);
   const [loading, setLoading] = useState(true);
   const [userRole, setUserRole] = useState<'admin' | 'worker'>('worker');
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState<User | null>(null);
 
   useEffect(() => {
     const loadSites = async () => {
@@ -44,7 +35,7 @@ export default function SiteSelectionScreen() {
     loadSites();
   }, []);
 
-  const handleSiteSelection = async (site: Site) => {
+  const handleSiteSelection = async (site: SiteWithStats) => {
     try {
       console.log('Selecionando canteiro:', site);
       await AuthService.setCurrentSite(site);
@@ -79,7 +70,7 @@ export default function SiteSelectionScreen() {
     }
   };
 
-  const renderSiteItem = ({ item }: { item: Site }) => {
+  const renderSiteItem = ({ item }: { item: SiteWithStats }) => {
     const completionPercentage = item.tasksCount > 0 
       ? Math.round((item.completedTasks / item.tasksCount) * 100) 
       : 0;

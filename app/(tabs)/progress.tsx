@@ -1,10 +1,23 @@
+/**
+ * Tela de Progresso - Layout Estilo Rede Social
+ * 
+ * Esta tela foi transformada em um layout estilo rede social onde:
+ * - As tarefas são exibidas como cards com fotos em destaque
+ * - Cada card mostra: status, prioridade, foto principal, título, descrição
+ * - Informações como área, responsável e data de vencimento
+ * - Botão "Ver Detalhes" para acessar a tarefa completa
+ * - Layout responsivo e moderno similar ao Instagram/Facebook
+ */
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, Dimensions, TouchableOpacity, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Image, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ChartBar as BarChart3, TrendingUp, Clock, CircleCheck as CheckCircle, RefreshCw } from 'lucide-react-native';
+import { ChartBar as BarChart3, TrendingUp, Clock, CircleCheck as CheckCircle, RefreshCw, Eye, Calendar, User, MapPin } from 'lucide-react-native';
 import { ProgressService, ProgressData } from '@/services/ProgressService';
+import taskService, { Task } from '@/services/TaskService';
+import { router } from 'expo-router';
+import Svg, { Circle, G, Text as SvgText } from 'react-native-svg';
 
-const screenWidth = Dimensions.get('window').width;
+const { width } = Dimensions.get('window');
 
 export default function ProgressScreen() {
   const [progressData, setProgressData] = useState<ProgressData>({
@@ -16,21 +29,27 @@ export default function ProgressScreen() {
     weeklyProgress: [],
     areaProgress: [],
   });
+  const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
-    loadProgressData();
+    loadData();
   }, []);
 
-  const loadProgressData = async () => {
+  const loadData = async () => {
     try {
-      console.log('[ProgressScreen] Carregando dados de progresso...');
-      const data = await ProgressService.getInstance().getProgressData();
-      console.log('[ProgressScreen] Dados carregados:', data);
-      setProgressData(data);
+      console.log('[ProgressScreen] Carregando dados...');
+      const [progress, tasksData] = await Promise.all([
+        ProgressService.getInstance().getProgressData(),
+        taskService.getTasks()
+      ]);
+      
+      console.log('[ProgressScreen] Dados carregados:', { progress, tasksCount: tasksData.length });
+      setProgressData(progress);
+      setTasks(tasksData);
     } catch (error) {
-      console.error('[ProgressScreen] Erro ao carregar dados de progresso:', error);
+      console.error('[ProgressScreen] Erro ao carregar dados:', error);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -39,83 +58,141 @@ export default function ProgressScreen() {
 
   const onRefresh = () => {
     setRefreshing(true);
-    loadProgressData();
+    loadData();
   };
 
-  const renderPieChart = () => {
-    const chartData = [
-      {
-        name: 'Concluídas',
-        population: progressData.completedTasks,
-        color: '#10B981',
-      },
-      {
-        name: 'Em Andamento',
-        population: progressData.inProgressTasks,
-        color: '#F59E0B',
-      },
-      {
-        name: 'Pendentes',
-        population: progressData.pendingTasks,
-        color: '#EF4444',
-      },
-    ].filter(item => item.population > 0); // Filtrar apenas itens com dados
+  const getStatusColor = (status: Task['status']) => {
+    switch (status) {
+      case 'completed': return '#10B981';
+      case 'in_progress': return '#F59E0B';
+      case 'delayed': return '#EF4444';
+      default: return '#6B7280';
+    }
+  };
 
-    if (chartData.length === 0) {
+  const getStatusText = (status: Task['status']) => {
+    switch (status) {
+      case 'completed': return 'Concluída';
+      case 'in_progress': return 'Em Andamento';
+      case 'delayed': return 'Atrasada';
+      default: return 'Pendente';
+    }
+  };
+
+  const getPriorityColor = (priority: Task['priority']) => {
+    switch (priority) {
+      case 'high': return '#EF4444';
+      case 'medium': return '#F59E0B';
+      default: return '#10B981';
+    }
+  };
+
+  const getPriorityText = (priority: Task['priority']) => {
+    switch (priority) {
+      case 'high': return 'Alta';
+      case 'medium': return 'Média';
+      default: return 'Baixa';
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('pt-BR');
+  };
+
+  // Log para depuração
+  console.log('Tarefas carregadas para o gráfico:', tasks.map(t => ({ id: t.id, status: t.status, siteId: t.siteId })));
+
+  // Cálculo dos status diretamente das tarefas carregadas
+  const completedTasks = tasks.filter(t => t.status === 'completed').length;
+  const inProgressTasks = tasks.filter(t => t.status === 'in_progress').length;
+  const pendingTasks = tasks.filter(t => t.status === 'pending' || !t.status).length;
+  const totalTasks = tasks.length;
+
+  // Função para criar o gráfico de pizza
+  const createPieChart = () => {
+    const size = 200;
+    const radius = size / 2;
+    const center = size / 2;
+    
+    const data = [
+      { value: completedTasks, color: '#10B981', label: 'Concluídas' },
+      { value: inProgressTasks, color: '#F59E0B', label: 'Em Andamento' },
+      { value: pendingTasks, color: '#6B7280', label: 'Pendentes' },
+    ].filter(item => item.value > 0);
+
+    if (totalTasks === 0) {
       return (
-        <View style={styles.pieChartContainer}>
-          <Text style={styles.chartTitle}>Distribuição das Tarefas</Text>
-          <View style={styles.emptyChartContainer}>
-            <Text style={styles.emptyChartText}>Nenhuma tarefa encontrada</Text>
-          </View>
+        <View style={styles.emptyChartContainer}>
+          <Text style={styles.emptyChartText}>Nenhuma tarefa encontrada</Text>
         </View>
       );
     }
 
-    const total = chartData.reduce((sum, item) => sum + item.population, 0);
+    const total = data.reduce((sum, item) => sum + item.value, 0);
+    let currentAngle = 0;
+
+    const segments = data.map((item, index) => {
+      const percentage = item.value / total;
+      const angle = percentage * 360;
+      const startAngle = currentAngle;
+      currentAngle += angle;
+      return (
+        <Circle
+          key={index}
+          cx={center}
+          cy={center}
+          r={radius}
+          fill="none"
+          stroke={item.color}
+          strokeWidth={40}
+          strokeDasharray={`${percentage * 2 * Math.PI * radius} ${2 * Math.PI * radius}`}
+          strokeDashoffset={-startAngle * Math.PI / 180 * radius}
+          transform={`rotate(-90 ${center} ${center})`}
+        />
+      );
+    });
 
     return (
-      <View style={styles.pieChartContainer}>
-        <Text style={styles.chartTitle}>Distribuição das Tarefas</Text>
-        
-        {/* Gráfico de pizza simples usando círculos coloridos lado a lado */}
-        <View style={styles.pieChartWrapper}>
-          <View style={styles.pieChart}>
-            {chartData.map((item, index) => {
-              const percentage = (item.population / total) * 100;
-              
-              return (
-                <View key={index} style={styles.pieSliceContainer}>
-                  <View
-                    style={[
-                      styles.pieSlice,
-                      {
-                        backgroundColor: item.color,
-                        flex: item.population,
-                      }
-                    ]}
-                  />
-                </View>
-              );
-            })}
-          </View>
-          
-          {/* Informações centrais */}
-          <View style={styles.pieChartCenter}>
-            <Text style={styles.pieChartTotal}>{total}</Text>
-            <Text style={styles.pieChartLabel}>Total</Text>
-          </View>
-        </View>
-
+      <View style={styles.chartContainer}>
+        <Svg width={size} height={size}>
+          {segments}
+          {/* Círculo central branco */}
+          <Circle
+            cx={center}
+            cy={center}
+            r={radius - 20}
+            fill="#FFFFFF"
+          />
+          {/* Texto central */}
+          <SvgText
+            x={center}
+            y={center - 10}
+            fontSize="24"
+            fontWeight="bold"
+            textAnchor="middle"
+            fill="#111827"
+          >
+            {totalTasks}
+          </SvgText>
+          <SvgText
+            x={center}
+            y={center + 15}
+            fontSize="14"
+            textAnchor="middle"
+            fill="#6B7280"
+          >
+            Total
+          </SvgText>
+        </Svg>
         {/* Legenda */}
         <View style={styles.legendContainer}>
-          {chartData.map((item, index) => (
+          {data.map((item, index) => (
             <View key={index} style={styles.legendItem}>
               <View style={[styles.legendColor, { backgroundColor: item.color }]} />
-              <View style={styles.legendTextContainer}>
-                <Text style={styles.legendText}>{item.name}</Text>
-                <Text style={styles.legendValue}>{item.population} tarefas</Text>
-              </View>
+              <Text style={styles.legendText}>
+                {item.label}: {item.value}
+              </Text>
             </View>
           ))}
         </View>
@@ -123,62 +200,74 @@ export default function ProgressScreen() {
     );
   };
 
-  const renderWeeklyChart = () => {
-    const maxValue = Math.max(...progressData.weeklyProgress.map(item => item.completed), 1);
-    const chartHeight = 120;
+  const renderTaskCard = (task: Task) => {
+    const mainPhoto = task.photos && task.photos.length > 0 ? task.photos[0] : 'https://placehold.co/600x400?text=Sem+Foto';
     
     return (
-      <View style={styles.chartContainer}>
-        <Text style={styles.chartTitle}>Progresso Semanal</Text>
-        <View style={styles.chart}>
-          {progressData.weeklyProgress.map((item) => {
-            const barHeight = (item.completed / maxValue) * chartHeight;
-            return (
-              <View key={item.day} style={styles.chartBar}>
-                <View style={styles.barContainer}>
-                  <View 
-                    style={[
-                      styles.bar, 
-                      { 
-                        height: barHeight,
-                        backgroundColor: item.completed > 0 ? '#F97316' : '#E5E7EB'
-                      }
-                    ]} 
-                  />
-                </View>
-                <Text style={styles.chartLabel}>{item.day}</Text>
-                <Text style={styles.chartValue}>{item.completed}</Text>
-              </View>
-            );
-          })}
-        </View>
-      </View>
-    );
-  };
-
-  const renderAreaProgress = () => {
-    return (
-      <View style={styles.areaContainer}>
-        <Text style={styles.sectionTitle}>Progresso por Área</Text>
-        {progressData.areaProgress.map((area, index) => (
-          <View key={index} style={styles.areaItem}>
-            <View style={styles.areaHeader}>
-              <Text style={styles.areaName}>{area.area}</Text>
-              <Text style={styles.areaPercentage}>{area.percentage}%</Text>
+      <View key={task.id} style={styles.taskCard}>
+        {/* Cabeçalho do card */}
+        <View style={styles.taskHeader}>
+          <View style={styles.taskHeaderLeft}>
+            <View style={[styles.statusBadge, { backgroundColor: getStatusColor(task.status) }]}> 
+              <Text style={styles.statusText}>{getStatusText(task.status)}</Text>
             </View>
-            <View style={styles.areaProgressBar}>
-              <View 
-                style={[
-                  styles.areaProgressFill, 
-                  { width: `${area.percentage}%` }
-                ]} 
-              />
+            <View style={[styles.priorityBadge, { backgroundColor: getPriorityColor(task.priority) }]}> 
+              <Text style={styles.priorityText}>{getPriorityText(task.priority)}</Text>
             </View>
-            <Text style={styles.areaStats}>
-              {area.completed} de {area.total} tarefas concluídas
-            </Text>
           </View>
-        ))}
+          <Text style={styles.taskDate}>{formatDate(task.createdAt)}</Text>
+        </View>
+
+        {/* Foto principal */}
+        <View style={styles.photoContainer}>
+          <Image 
+            source={{ uri: mainPhoto }} 
+            style={styles.mainPhoto}
+            resizeMode="cover"
+          />
+          {task.photos && task.photos.length > 1 && (
+            <View style={styles.photoCountBadge}>
+              <Text style={styles.photoCountText}>+{task.photos.length - 1}</Text>
+            </View>
+          )}
+        </View>
+
+        {/* Conteúdo do card */}
+        <View style={styles.taskContent}>
+          <Text style={styles.taskTitle} numberOfLines={2}>{task.title}</Text>
+          <Text style={styles.taskDescription} numberOfLines={3}>{task.description}</Text>
+          
+          {/* Informações da tarefa */}
+          <View style={styles.taskInfo}>
+            <View style={styles.taskInfoItem}>
+              <MapPin size={16} color="#6B7280" />
+              <Text style={styles.taskInfoText}>{task.area}</Text>
+            </View>
+            
+            {task.assignedTo && (
+              <View style={styles.taskInfoItem}>
+                <User size={16} color="#6B7280" />
+                <Text style={styles.taskInfoText}>{task.assignedTo}</Text>
+              </View>
+            )}
+            
+            {task.dueDate && (
+              <View style={styles.taskInfoItem}>
+                <Calendar size={16} color="#6B7280" />
+                <Text style={styles.taskInfoText}>Vence: {formatDate(task.dueDate)}</Text>
+              </View>
+            )}
+          </View>
+
+          {/* Botão de ver detalhes */}
+          <TouchableOpacity 
+            style={styles.detailsButton}
+            onPress={() => router.push(`/admin/tasks/${task.id}`)}
+          >
+            <Eye size={16} color="#FFFFFF" />
+            <Text style={styles.detailsButtonText}>Ver Detalhes</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     );
   };
@@ -187,7 +276,7 @@ export default function ProgressScreen() {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Carregando dados...</Text>
+          <Text style={styles.loadingText}>Carregando tarefas...</Text>
         </View>
       </SafeAreaView>
     );
@@ -223,72 +312,21 @@ export default function ProgressScreen() {
           />
         }
       >
-        <View style={styles.statsGrid}>
-          <View style={styles.statCard}>
-            <View style={styles.statIconContainer}>
-              <CheckCircle size={24} color="#10B981" />
-            </View>
-            <Text style={styles.statNumber}>{progressData.completedTasks}</Text>
-            <Text style={styles.statLabel}>Concluídas</Text>
-          </View>
-          
-          <View style={styles.statCard}>
-            <View style={styles.statIconContainer}>
-              <Clock size={24} color="#F59E0B" />
-            </View>
-            <Text style={styles.statNumber}>{progressData.inProgressTasks}</Text>
-            <Text style={styles.statLabel}>Em Andamento</Text>
-          </View>
-          
-          <View style={styles.statCard}>
-            <View style={styles.statIconContainer}>
-              <BarChart3 size={24} color="#EF4444" />
-            </View>
-            <Text style={styles.statNumber}>{progressData.pendingTasks}</Text>
-            <Text style={styles.statLabel}>Pendentes</Text>
-          </View>
-          
-          <View style={styles.statCard}>
-            <View style={styles.statIconContainer}>
-              <TrendingUp size={24} color="#F97316" />
-            </View>
-            <Text style={styles.statNumber}>{progressData.totalTasks}</Text>
-            <Text style={styles.statLabel}>Total</Text>
-          </View>
+        {/* Gráfico de Pizza */}
+        <View style={styles.chartSection}>
+          <Text style={styles.sectionTitle}>Distribuição por Status</Text>
+          {createPieChart()}
         </View>
 
-        {renderPieChart()}
-        {renderWeeklyChart()}
-        {renderAreaProgress()}
-
-        <View style={styles.insightsContainer}>
-          <Text style={styles.sectionTitle}>Insights</Text>
-          <View style={styles.insightCard}>
-            <TrendingUp size={20} color="#10B981" />
-            <Text style={styles.insightText}>
-              {progressData.completedTasks > 0 
-                ? `Excelente progresso! ${progressData.completedTasks} tarefas foram concluídas.`
-                : 'Comece completando as tarefas pendentes para ver o progresso.'
-              }
-            </Text>
-          </View>
-          
-          {progressData.completionRate > 75 && (
-            <View style={styles.insightCard}>
-              <CheckCircle size={20} color="#10B981" />
-              <Text style={styles.insightText}>
-                Parabéns! A obra está quase concluída com {progressData.completionRate}% de progresso.
-              </Text>
+        <View style={styles.tasksContainer}>
+          <Text style={styles.sectionTitle}>Tarefas Recentes</Text>
+          {tasks.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyText}>Nenhuma tarefa encontrada</Text>
+              <Text style={styles.emptySubtext}>As tarefas aparecerão aqui quando forem criadas</Text>
             </View>
-          )}
-          
-          {progressData.pendingTasks > 5 && (
-            <View style={styles.insightCard}>
-              <Clock size={20} color="#F59E0B" />
-              <Text style={styles.insightText}>
-                Há {progressData.pendingTasks} tarefas pendentes. Considere redistribuir as prioridades.
-              </Text>
-            </View>
+          ) : (
+            tasks.map(renderTaskCard)
           )}
         </View>
       </ScrollView>
@@ -347,152 +385,149 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingBottom: 24,
   },
-  statsGrid: {
-    flexDirection: 'row',
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    flexWrap: 'wrap',
-  },
-  statCard: {
-    width: '48%',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 16,
-    marginHorizontal: '1%',
-    marginBottom: 8,
-    alignItems: 'center',
-    boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-    elevation: 4,
-  },
-  statIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#F8F9FA',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  statNumber: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#111827',
-  },
-  statLabel: {
-    fontSize: 11,
-    color: '#6B7280',
-    marginTop: 2,
-    textAlign: 'center',
-  },
-  chartContainer: {
-    marginVertical: 20,
-    paddingHorizontal: 20,
-  },
-  chartTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#111827',
-    marginBottom: 16,
-  },
-  chart: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'flex-end',
-    height: 160,
-  },
-  chartBar: {
-    alignItems: 'center',
-    flex: 1,
-  },
-  barContainer: {
-    height: 120,
-    justifyContent: 'flex-end',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  bar: {
-    width: 20,
-    borderRadius: 4,
-    minHeight: 4,
-  },
-  chartLabel: {
-    fontSize: 12,
-    color: '#6B7280',
-    marginBottom: 4,
-  },
-  chartValue: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#111827',
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#111827',
-    paddingHorizontal: 20,
-    marginBottom: 16,
-  },
-  areaContainer: {
+  chartSection: {
+    marginHorizontal: 16,
+    marginBottom: 20,
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
     padding: 20,
-    marginHorizontal: 16,
-    marginBottom: 16,
     boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+    elevation: 4,
   },
-  areaItem: {
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#111827',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  tasksContainer: {
+    marginHorizontal: 16,
     marginBottom: 20,
   },
-  areaHeader: {
+  emptyContainer: {
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  emptyText: {
+    fontSize: 16,
+    color: '#6B7280',
+    fontWeight: '500',
+  },
+  emptySubtext: {
+    fontSize: 14,
+    color: '#9CA3AF',
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  taskCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+    boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+    elevation: 4,
+  },
+  taskHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 8,
   },
-  areaName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#111827',
+  taskHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
-  areaPercentage: {
-    fontSize: 14,
+  statusBadge: {
+    padding: 4,
+    borderRadius: 4,
+    marginRight: 8,
+  },
+  statusText: {
+    fontSize: 12,
     fontWeight: '700',
-    color: '#F97316',
+    color: '#FFFFFF',
   },
-  areaProgressBar: {
-    height: 8,
-    backgroundColor: '#E5E7EB',
+  priorityBadge: {
+    padding: 4,
     borderRadius: 4,
-    overflow: 'hidden',
-    marginBottom: 8,
+    marginRight: 8,
   },
-  areaProgressFill: {
-    height: '100%',
-    backgroundColor: '#F97316',
-    borderRadius: 4,
+  priorityText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
-  areaStats: {
+  taskDate: {
     fontSize: 12,
     color: '#6B7280',
   },
-  insightsContainer: {
-    marginHorizontal: 16,
+  photoContainer: {
+    position: 'relative',
+    marginBottom: 16,
   },
-  insightCard: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    backgroundColor: '#FFFFFF',
+  mainPhoto: {
+    width: '100%',
+    height: 200,
+    borderRadius: 8,
+  },
+  photoCountBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    padding: 2,
     borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
-  insightText: {
-    fontSize: 14,
-    color: '#374151',
-    marginLeft: 12,
+  photoCountText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  taskContent: {
     flex: 1,
-    lineHeight: 20,
+  },
+  taskTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#111827',
+    marginBottom: 8,
+  },
+  taskDescription: {
+    fontSize: 12,
+    color: '#6B7280',
+  },
+  taskInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+    flexWrap: 'wrap',
+  },
+  taskInfoItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 16,
+    marginBottom: 8,
+  },
+  taskInfoText: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginLeft: 4,
+  },
+  detailsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 12,
+    borderRadius: 8,
+    backgroundColor: '#F97316',
+    marginTop: 8,
+  },
+  detailsButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    marginLeft: 8,
   },
   refreshButton: {
     padding: 8,
@@ -500,84 +535,21 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     marginLeft: 16,
   },
-  pieChartContainer: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 20,
-    marginHorizontal: 16,
-    marginBottom: 16,
-    boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-    elevation: 4,
-  },
-  emptyChartContainer: {
-    height: 200,
-    justifyContent: 'center',
+  chartContainer: {
     alignItems: 'center',
-  },
-  emptyChartText: {
-    fontSize: 14,
-    color: '#6B7280',
-  },
-  pieChartWrapper: {
-    alignItems: 'center',
-    marginVertical: 20,
-    position: 'relative',
-  },
-  pieChart: {
-    width: 200,
-    height: 200,
-    borderRadius: 100,
-    overflow: 'hidden',
-    flexDirection: 'row',
-  },
-  pieSliceContainer: {
-    flex: 1,
-  },
-  pieSlice: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: '#FFFFFF',
-  },
-  pieChartCenter: {
-    position: 'absolute',
-    top: '50%',
-    left: '50%',
-    transform: [{ translateX: -30 }, { translateY: -20 }],
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 40,
-    width: 60,
-    height: 40,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  pieChartTotal: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#111827',
-  },
-  pieChartLabel: {
-    fontSize: 10,
-    color: '#6B7280',
+    marginBottom: 20,
   },
   legendContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
+    justifyContent: 'center',
     flexWrap: 'wrap',
-    paddingHorizontal: 20,
+    marginTop: 16,
+    gap: 16,
   },
   legendItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: 8,
-    minWidth: 120,
+    marginHorizontal: 4,
   },
   legendColor: {
     width: 16,
@@ -585,17 +557,18 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginRight: 8,
   },
-  legendTextContainer: {
-    flex: 1,
-  },
   legendText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#374151',
-  },
-  legendValue: {
     fontSize: 12,
     color: '#6B7280',
-    marginTop: 2,
+    fontWeight: '500',
+  },
+  emptyChartContainer: {
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  emptyChartText: {
+    fontSize: 16,
+    color: '#6B7280',
+    fontWeight: '500',
   },
 });

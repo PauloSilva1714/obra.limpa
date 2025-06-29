@@ -10,6 +10,7 @@ import {
   Animated,
   Dimensions,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { MapPin, Search, X, Navigation, Clock, Heart, HeartOff, Star } from 'lucide-react-native';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -42,9 +43,11 @@ export default function AddressSearch({
   const [isSearching, setIsSearching] = useState(false);
   const [isLoadingLocation, setIsLoadingLocation] = useState(false);
   
-  const inputRef = useRef<TextInput>(null);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
+
+  // Debounce para busca
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Carregar dados salvos ao abrir o modal
   useEffect(() => {
@@ -88,7 +91,7 @@ export default function AddressSearch({
       fadeAnim.setValue(0);
       slideAnim.setValue(50);
     }
-  }, [showModal]);
+  }, [showModal, fadeAnim, slideAnim]);
 
   const handleFocus = () => {
     setIsFocused(true);
@@ -96,28 +99,38 @@ export default function AddressSearch({
     setSearchText(value);
   };
 
-  const handleBlur = () => {
-    setIsFocused(false);
-  };
-
   const handleSearch = async (text: string) => {
     setSearchText(text);
+    
+    // Limpar timeout anterior
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
     
     if (!text.trim() || text.length < 3) {
       setSearchResults([]);
       return;
     }
 
+    // Debounce de 500ms
+    searchTimeoutRef.current = setTimeout(async () => {
     setIsSearching(true);
     try {
+        console.log('Iniciando busca para:', text);
       const results = await AddressService.searchAddresses(text);
+        console.log('Resultados da busca:', results);
       setSearchResults(results);
     } catch (error) {
       console.error('Erro na busca:', error);
       setSearchResults([]);
+        // Mostrar erro apenas se não for um erro de rede esperado
+        if (error instanceof Error && !error.message.includes('Failed to fetch')) {
+          Alert.alert('Erro', 'Não foi possível buscar endereços. Tente novamente.');
+        }
     } finally {
       setIsSearching(false);
     }
+    }, 500);
   };
 
   const handleAddressSelect = async (address: AddressResult) => {
@@ -287,6 +300,9 @@ export default function AddressSearch({
           placeholderTextColor={colors.textMuted}
           autoFocus
         />
+        {isSearching && (
+          <ActivityIndicator size="small" color={colors.primary} style={styles.searchLoading} />
+        )}
       </View>
 
       {/* Localização atual */}
@@ -347,24 +363,25 @@ export default function AddressSearch({
       <TouchableOpacity
         style={[
           styles.inputContainer,
-          { borderColor: isFocused ? colors.primary : colors.border, backgroundColor: colors.surface },
+          { 
+            borderColor: isFocused ? colors.primary : colors.border, 
+            backgroundColor: colors.surface 
+          },
           style
         ]}
         onPress={handleFocus}
         activeOpacity={0.8}
       >
         <MapPin size={20} color={colors.textMuted} style={styles.inputIcon} />
-        <TextInput
-          ref={inputRef}
-          style={[styles.input, { color: colors.text }]}
-          placeholder={placeholder}
-          value={value}
-          onChangeText={onChangeText}
-          onFocus={handleFocus}
-          onBlur={handleBlur}
-          placeholderTextColor={colors.textMuted}
-          editable={false}
-        />
+        <Text
+          style={[
+            styles.input,
+            { color: value ? colors.text : colors.textMuted }
+          ]}
+          numberOfLines={1}
+        >
+          {value || placeholder}
+        </Text>
         <TouchableOpacity
           style={styles.searchButton}
           onPress={handleFocus}
@@ -396,17 +413,36 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     height: 60,
     borderWidth: 1,
+    borderColor: '#E5E7EB',
+    backgroundColor: '#F9FAFB',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+    elevation: 2,
+    minHeight: 60,
+    justifyContent: 'flex-start',
   },
   inputIcon: {
     marginRight: 16,
+    opacity: 0.7,
   },
   input: {
     flex: 1,
     fontSize: 16,
     fontFamily: 'Inter-Regular',
+    backgroundColor: 'transparent',
+    paddingVertical: 0,
+    paddingHorizontal: 0,
+    lineHeight: 20,
+    textAlignVertical: 'center',
+    color: '#1F2937',
   },
   searchButton: {
     padding: 4,
+    marginLeft: 4,
+    backgroundColor: 'transparent',
+    borderRadius: 8,
   },
   modalOverlay: {
     flex: 1,
@@ -420,6 +456,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 40,
     maxHeight: '80%',
+    backgroundColor: '#FFFFFF',
   },
   modalHeader: {
     flexDirection: 'row',
@@ -431,6 +468,7 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontFamily: 'Inter-Bold',
     flex: 1,
+    color: '#1F2937',
   },
   closeButton: {
     padding: 4,
@@ -443,6 +481,8 @@ const styles = StyleSheet.create({
     height: 56,
     borderWidth: 1,
     marginBottom: 16,
+    backgroundColor: '#F9FAFB',
+    borderColor: '#E5E7EB',
   },
   searchIcon: {
     marginRight: 12,
@@ -451,6 +491,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 16,
     fontFamily: 'Inter-Regular',
+    color: '#1F2937',
   },
   currentLocationButton: {
     flexDirection: 'row',
@@ -460,11 +501,14 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderWidth: 1,
     marginBottom: 20,
+    backgroundColor: '#F9FAFB',
+    borderColor: '#E5E7EB',
   },
   currentLocationText: {
     fontSize: 16,
     fontFamily: 'Inter-Medium',
     marginLeft: 12,
+    color: '#1F2937',
   },
   addressList: {
     flex: 1,
@@ -479,10 +523,12 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 16,
     fontFamily: 'Inter-SemiBold',
+    color: '#1F2937',
   },
   sectionCount: {
     fontSize: 14,
     fontFamily: 'Inter-Regular',
+    color: '#6B7280',
   },
   addressItem: {
     flexDirection: 'row',
@@ -506,10 +552,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: 'Inter-Medium',
     marginBottom: 4,
+    color: '#1F2937',
   },
   addressSubtitle: {
     fontSize: 14,
     fontFamily: 'Inter-Regular',
+    color: '#6B7280',
   },
   favoriteButton: {
     padding: 8,
@@ -522,5 +570,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: 'Inter-Regular',
     textAlign: 'center',
+    color: '#6B7280',
+  },
+  searchLoading: {
+    marginLeft: 12,
   },
 }); 

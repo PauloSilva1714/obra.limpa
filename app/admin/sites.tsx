@@ -27,32 +27,45 @@ export default function SitesScreen() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let unsubscribes: (() => void)[] = [];
+    let isMounted = true;
+    const loadSites = async () => {
+      try {
+        setLoading(true);
+        const sitesData = await AuthService.getUserSites();
+        if (!isMounted) return;
+        unsubscribes = sitesData.map(site => {
+          console.log('Admin Sites - Site encontrado:', site.id);
+          return TaskService.subscribeToTasksBySite(site.id, (tasks) => {
+            console.log('Admin Sites - Atualização de tarefas recebida para site', site.id, tasks);
+            if (!isMounted) return;
+            const completedTasks = tasks.filter((task) => task.status === 'completed');
+            setSites(prevSites => {
+              const others = prevSites.filter(s => s.id !== site.id);
+              return [
+                ...others,
+                {
+                  ...site,
+                  tasksCount: tasks.length,
+                  completedTasks: completedTasks.length,
+                }
+              ];
+            });
+          });
+        });
+      } catch (error) {
+        console.error('Erro ao carregar obras:', error);
+        Alert.alert('Erro', 'Não foi possível carregar as obras');
+      } finally {
+        setLoading(false);
+      }
+    };
     loadSites();
+    return () => {
+      isMounted = false;
+      unsubscribes.forEach(unsub => unsub && unsub());
+    };
   }, []);
-
-  const loadSites = async () => {
-    try {
-      setLoading(true);
-      const sitesData = await AuthService.getUserSites();
-      const sitesWithStats = await Promise.all(
-        sitesData.map(async (site) => {
-          const tasks = await TaskService.getTasksBySite(site.id);
-          const completedTasks = tasks.filter((task) => task.status === 'completed');
-          return {
-            ...site,
-            tasksCount: tasks.length,
-            completedTasks: completedTasks.length,
-          };
-        })
-      );
-      setSites(sitesWithStats);
-    } catch (error) {
-      console.error('Erro ao carregar obras:', error);
-      Alert.alert('Erro', 'Não foi possível carregar as obras');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleCreateSite = () => {
     router.push('/admin/sites/create');
