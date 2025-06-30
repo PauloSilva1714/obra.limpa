@@ -219,7 +219,7 @@ export class TaskService {
     }
   }
 
-  async getTaskById(taskId: string): Promise<Task | null> {
+  static async getTaskById(taskId: string): Promise<Task | null> {
     try {
       const taskDoc = await getDoc(doc(db, 'tasks', taskId));
       if (!taskDoc.exists()) {
@@ -428,7 +428,7 @@ export class TaskService {
     });
   }
 
-  async addComment(taskId: string, comment: Comment): Promise<void> {
+  static async addComment(taskId: string, comment: Comment): Promise<void> {
     try {
       const taskRef = doc(db, 'tasks', taskId);
       const taskDoc = await getDoc(taskRef);

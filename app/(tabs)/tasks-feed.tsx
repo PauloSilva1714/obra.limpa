@@ -29,14 +29,14 @@ import {
   MapPin,
 } from 'lucide-react-native';
 import { Feather } from '@expo/vector-icons';
-import taskService, { Task, Comment, TaskService } from '@/services/TaskService';
+import taskService, { Task, Comment } from '@/services/TaskService';
 import { AuthService } from '@/services/AuthService';
 import { EmailService } from '@/services/EmailService';
 import { TaskModal } from '@/components/TaskModal';
 import { useTheme } from '@/contexts/ThemeContext';
 import { t } from '@/config/i18n';
 
-export default function TasksScreen() {
+export default function TasksFeedScreen() {
   const { colors } = useTheme();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
@@ -269,34 +269,6 @@ export default function TasksScreen() {
     }
   };
 
-  const formatUserName = (fullName: string) => {
-    const names = fullName.trim().split(' ');
-    if (names.length >= 2) {
-      return `${names[0]} ${names[1]}`;
-    }
-    return names[0] || fullName;
-  };
-
-  const formatCommentDateTime = (timestamp: string) => {
-    const date = new Date(timestamp);
-    const today = new Date();
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
-
-    const timeString = date.toLocaleTimeString('pt-BR', { 
-      hour: '2-digit', 
-      minute: '2-digit' 
-    });
-
-    if (date.toDateString() === today.toDateString()) {
-      return `Hoje às ${timeString}`;
-    } else if (date.toDateString() === yesterday.toDateString()) {
-      return `Ontem às ${timeString}`;
-    } else {
-      return `${date.toLocaleDateString('pt-BR')} às ${timeString}`;
-    }
-  };
-
   const handleOpenComments = (task: Task) => {
     setSelectedTaskForComments(task);
     setCommentModalVisible(true);
@@ -314,7 +286,7 @@ export default function TasksScreen() {
         timestamp: new Date().toISOString(),
       };
 
-      await TaskService.addComment(selectedTaskForComments.id, comment);
+      await taskService.addComment(selectedTaskForComments.id, comment);
       
       // Atualizar a lista de tarefas
       await loadTasks();
@@ -337,10 +309,10 @@ export default function TasksScreen() {
           </View>
           <View style={styles.userDetails}>
             <Text style={[styles.userName, { color: colors.text }]}>
-              {formatUserName(item.assignedTo || '')}
+              {item.assignedTo || 'Não designado'}
             </Text>
             <Text style={[styles.taskDate, { color: colors.textMuted }]}>
-              {formatCommentDateTime(item.createdAt)}
+              {new Date(item.createdAt).toLocaleDateString('pt-BR')}
             </Text>
           </View>
         </View>
@@ -415,27 +387,16 @@ export default function TasksScreen() {
         
         {item.comments && item.comments.length > 0 && (
           <View style={styles.commentsPreview}>
-            {item.comments.slice(0, 2).map((comment, index) => {
-              const isOwnComment = currentUser && comment.userId === currentUser.id;
-              return (
-                <View key={comment.id} style={[
-                  styles.commentItem,
-                  isOwnComment ? styles.ownComment : styles.otherComment
-                ]}>
-                  <View style={[
-                    styles.commentBubble,
-                    isOwnComment ? styles.ownCommentBubble : styles.otherCommentBubble
-                  ]}>
-                    <Text style={[styles.commentText, { color: '#1F2937' }]} numberOfLines={2}>
-                      {comment.text}
-                    </Text>
-                    <Text style={[styles.commentTime, { color: '#6B7280' }]}>
-                      {formatCommentDateTime(comment.timestamp)}
-                    </Text>
-                  </View>
-                </View>
-              );
-            })}
+            {item.comments.slice(0, 2).map((comment, index) => (
+              <View key={comment.id} style={styles.commentItem}>
+                <Text style={[styles.commentUserName, { color: colors.text }]}>
+                  {comment.userName}
+                </Text>
+                <Text style={[styles.commentText, { color: colors.textSecondary }]} numberOfLines={1}>
+                  {comment.text}
+                </Text>
+              </View>
+            ))}
             {item.comments.length > 2 && (
               <TouchableOpacity onPress={() => handleOpenComments(item)}>
                 <Text style={[styles.viewMoreComments, { color: colors.primary }]}>
@@ -560,30 +521,21 @@ export default function TasksScreen() {
             </View>
             
             <ScrollView style={styles.commentsList}>
-              {selectedTaskForComments?.comments?.map((comment) => {
-                const isOwnComment = currentUser && comment.userId === currentUser.id;
-                return (
-                  <View key={comment.id} style={[
-                    styles.commentItemFull,
-                    isOwnComment ? styles.ownCommentFull : styles.otherCommentFull
-                  ]}>
-                    <View style={[
-                      styles.commentBubbleFull,
-                      isOwnComment ? styles.ownCommentBubbleFull : styles.otherCommentBubbleFull
-                    ]}>
-                      <Text style={[styles.commentUserName, { color: '#6B7280' }]}>
-                        {formatUserName(comment.userName)}
-                      </Text>
-                      <Text style={[styles.commentTextFull, { color: '#1F2937' }]}>
-                        {comment.text}
-                      </Text>
-                      <Text style={[styles.commentTimeFull, { color: '#6B7280' }]}>
-                        {formatCommentDateTime(comment.timestamp)}
-                      </Text>
-                    </View>
+              {selectedTaskForComments?.comments?.map((comment) => (
+                <View key={comment.id} style={styles.commentItemFull}>
+                  <View style={styles.commentHeader}>
+                    <Text style={[styles.commentUserName, { color: colors.text }]}>
+                      {comment.userName}
+                    </Text>
+                    <Text style={[styles.commentTime, { color: colors.textMuted }]}>
+                      {new Date(comment.timestamp).toLocaleDateString('pt-BR')}
+                    </Text>
                   </View>
-                );
-              })}
+                  <Text style={[styles.commentTextFull, { color: colors.textSecondary }]}>
+                    {comment.text}
+                  </Text>
+                </View>
+              ))}
             </ScrollView>
             
             <View style={styles.commentInputContainer}>
@@ -800,34 +752,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
   },
-  ownComment: {
-    justifyContent: 'flex-end',
-  },
-  otherComment: {
-    justifyContent: 'flex-start',
-  },
-  commentBubble: {
-    maxWidth: '80%',
-    padding: 12,
-    borderRadius: 18,
-    backgroundColor: '#F5F5F5',
-  },
-  ownCommentBubble: {
-    backgroundColor: '#E3F2FD',
-  },
-  otherCommentBubble: {
-    backgroundColor: '#F5F5F5',
+  commentUserName: {
+    fontSize: 12,
+    fontFamily: 'Inter-SemiBold',
   },
   commentText: {
-    fontSize: 14,
+    fontSize: 12,
     fontFamily: 'Inter-Regular',
-    lineHeight: 20,
-    marginBottom: 4,
-  },
-  commentTime: {
-    fontSize: 11,
-    fontFamily: 'Inter-Regular',
-    alignSelf: 'flex-end',
+    flex: 1,
   },
   viewMoreComments: {
     fontSize: 12,
@@ -927,7 +859,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 4,
   },
-  commentTimeFull: {
+  commentTime: {
     fontSize: 11,
     fontFamily: 'Inter-Regular',
   },
@@ -1008,29 +940,4 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: 'Inter-SemiBold',
   },
-  ownCommentFull: {
-    justifyContent: 'flex-end',
-    marginBottom: 16,
-  },
-  otherCommentFull: {
-    justifyContent: 'flex-start',
-    marginBottom: 16,
-  },
-  commentBubbleFull: {
-    maxWidth: '80%',
-    padding: 12,
-    borderRadius: 18,
-    backgroundColor: '#F5F5F5',
-  },
-  ownCommentBubbleFull: {
-    backgroundColor: '#E3F2FD',
-  },
-  otherCommentBubbleFull: {
-    backgroundColor: '#F5F5F5',
-  },
-  commentUserName: {
-    fontSize: 12,
-    fontFamily: 'Inter-SemiBold',
-    marginBottom: 4,
-  },
-});
+}); 

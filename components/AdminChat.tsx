@@ -337,7 +337,7 @@ export default function AdminChat({ siteId, style }: AdminChatProps) {
           >
             <MessageCircle size={20} color={activeTab === 'messages' ? colors.primary : colors.textMuted} />
             <Text style={[styles.tabText, { color: activeTab === 'messages' ? colors.primary : colors.textMuted }]}>
-              Chat Grupal
+              Chat em Grupo
             </Text>
           </TouchableOpacity>
           
@@ -382,7 +382,7 @@ export default function AdminChat({ siteId, style }: AdminChatProps) {
             <View style={[styles.chatTypeIndicator, { backgroundColor: colors.primary + '20' }]}>
               <Users size={16} color={colors.primary} />
               <Text style={[styles.chatTypeText, { color: colors.primary }]}>
-                Chat Grupal - Enviando para todos os administradores
+                Chat em Grupo - Enviando para todos os administradores
               </Text>
             </View>
             

@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Platform, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, Shield, Download, Trash2, CheckCircle } from 'lucide-react-native';
 import { router } from 'expo-router';
-import Modal from 'react-native-modal';
 
 export default function PrivacyScreen() {
   const [showPolicy, setShowPolicy] = useState(false);
@@ -58,7 +57,7 @@ export default function PrivacyScreen() {
       </ScrollView>
 
       {/* Modal de Política de Privacidade */}
-      <Modal isVisible={showPolicy} onBackdropPress={() => setShowPolicy(false)} style={styles.rnModal}>
+      <Modal visible={showPolicy} transparent animationType="slide" onRequestClose={() => setShowPolicy(false)}>
         <SafeAreaView style={styles.modalContainer}>
           <View style={styles.modalHeader}>
             <TouchableOpacity onPress={() => setShowPolicy(false)}>
@@ -115,7 +114,6 @@ const styles = StyleSheet.create({
   modalTitle: { flex: 1, fontSize: 18, fontWeight: 'bold', textAlign: 'center', color: '#111827' },
   modalContent: { padding: 16 },
   policyText: { fontSize: 15, color: '#374151', lineHeight: 22 },
-  rnModal: { margin: 0, justifyContent: 'center' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center' },
   confirmModal: { backgroundColor: '#fff', borderRadius: 16, padding: 24, width: '90%', maxWidth: 400 },
   confirmTitle: { fontSize: 18, fontWeight: 'bold', color: '#DC2626', textAlign: 'center', marginBottom: 8 },

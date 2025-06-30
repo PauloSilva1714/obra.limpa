@@ -172,7 +172,7 @@ export default function AdminChatScreen() {
                 Chat de Administradores
               </Text>
               <Text style={[styles.headerSubtitle, { color: colors.textMuted }]}>
-                {currentSite.name} - {chatMode === 'group' ? 'Chat Grupal' : chatMode === 'sessions' ? 'Conversas Individuais' : 'Chat Individual'}
+                {currentSite.name} - {chatMode === 'group' ? 'Chat em Grupo' : chatMode === 'sessions' ? 'Conversas Individuais' : 'Chat Individual'}
               </Text>
             </View>
 
