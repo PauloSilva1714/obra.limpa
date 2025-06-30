@@ -310,18 +310,18 @@ export class AuthService {
       console.log('🔍 UID do usuário autenticado:', userCredential.user.uid);
       console.log('🔍 Estado da autenticação:', auth.currentUser ? 'Autenticado' : 'Não autenticado');
       
-      try {
+        try {
         console.log('🔍 Iniciando busca dos dados do usuário com abordagem específica para web...');
-        
-        // Verificar se ainda está autenticado
-        if (!auth.currentUser) {
-          console.error('❌ Usuário não está mais autenticado!');
-          throw new Error('Sessão expirada. Faça login novamente.');
-        }
-        
-        const userDocRef = doc(db, 'users', userCredential.user.uid);
-        console.log('🔍 Referência do documento criada:', userDocRef.path);
-        
+          
+          // Verificar se ainda está autenticado
+          if (!auth.currentUser) {
+            console.error('❌ Usuário não está mais autenticado!');
+            throw new Error('Sessão expirada. Faça login novamente.');
+          }
+          
+          const userDocRef = doc(db, 'users', userCredential.user.uid);
+          console.log('🔍 Referência do documento criada:', userDocRef.path);
+          
         // Usar a função específica para web que lida com o problema "client is offline"
         userDoc = await tryWebFirestoreOperation(
           () => getDoc(userDocRef),
@@ -331,14 +331,14 @@ export class AuthService {
         
         console.log('✅ Dados do usuário obtidos com sucesso usando abordagem específica para web');
         
-      } catch (firestoreError: any) {
+        } catch (firestoreError: any) {
         console.error('❌ Erro no processo de login:', firestoreError);
         
         // Se for erro de permissão ou "not found", significa que está funcionando mas o usuário não existe
         if (firestoreError.message.includes('permission') || firestoreError.message.includes('not found')) {
           console.log('⚠️ Usuário não encontrado no Firestore. Criando documento básico...');
           userDoc = null; // Permitir que continue para criar o documento
-        } else {
+            } else {
           // Para outros erros, tentar resolver o problema específico de "client is offline"
           console.log('🔧 Tentando resolver problema específico de "client is offline"...');
           const offlineFixSuccess = await fixWebClientOfflineIssue();
@@ -355,7 +355,7 @@ export class AuthService {
                 console.log('⚠️ Usuário não encontrado no Firestore. Criando documento básico...');
                 userDoc = null; // Permitir que continue para criar o documento
               } else {
-                throw new Error('Serviço temporariamente indisponível. Tente novamente em alguns instantes.');
+              throw new Error('Serviço temporariamente indisponível. Tente novamente em alguns instantes.');
               }
             }
           } else {
@@ -1026,14 +1026,14 @@ export class AuthService {
       const batchSize = 10;
       for (let i = 0; i < userSiteIds.length; i += batchSize) {
         const batchIds = userSiteIds.slice(i, i + batchSize);
-        const sitesQuery = query(
-          collection(db, 'sites'),
+      const sitesQuery = query(
+        collection(db, 'sites'),
           where('__name__', 'in', batchIds)
-        );
-        const sitesSnapshot = await getDocs(sitesQuery);
+      );
+      const sitesSnapshot = await getDocs(sitesQuery);
         allSites.push(...sitesSnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
+        id: doc.id,
+        ...doc.data()
         } as Site)));
       }
       return allSites;
@@ -2455,6 +2455,17 @@ export class AuthService {
       console.error('❌ Erro no diagnóstico:', error);
       issues.push('❌ Erro geral no diagnóstico: ' + error);
       return { success: false, issues, details };
+    }
+  }
+
+  async deleteInvite(inviteId: string): Promise<void> {
+    try {
+      console.log('[deleteInvite] Tentando excluir convite:', inviteId);
+      await deleteDoc(doc(db, 'invites', inviteId));
+      console.log('[deleteInvite] Convite excluído com sucesso:', inviteId);
+    } catch (error) {
+      console.error('[deleteInvite] Erro ao excluir convite:', error);
+      throw error;
     }
   }
 }

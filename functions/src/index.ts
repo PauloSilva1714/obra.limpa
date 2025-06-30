@@ -189,3 +189,35 @@ export const onUserDelete = functions.auth.user().onDelete(async (user) => {
     console.error('Error deleting user document:', error);
   }
 });
+
+/**
+ * Função que envia e-mail automaticamente quando um novo convite é criado no Firestore
+ */
+export const onInviteCreate = functions.firestore
+  .document('invites/{inviteId}')
+  .onCreate(async (snap, context) => {
+    const invite = snap.data();
+    if (!invite || !invite.email) return;
+
+    const subject = 'Convite para colaborar no Obra Limpa';
+    const html = `
+      <p>Olá,</p>
+      <p>Você foi convidado para colaborar no canteiro <b>${invite.siteName || ''}</b>.</p>
+      <p>Para aceitar o convite, acesse o aplicativo e registre-se com este e-mail.</p>
+      <p>Atenciosamente,<br/>Equipe Obra Limpa</p>
+    `;
+
+    try {
+      await transporter.sendMail({
+        from: `"Obra Limpa" <${gmailConfig.user}>`,
+        to: invite.email,
+        subject,
+        html,
+      });
+      console.log('Convite enviado para:', invite.email);
+    } catch (error) {
+      console.error('Erro ao enviar convite por e-mail:', error);
+    }
+  });
+
+// Forçar redeploy: alteração feita em 2024-06-29

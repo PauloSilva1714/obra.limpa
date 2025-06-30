@@ -38,37 +38,37 @@ if (Platform.OS === 'web') {
       }
     });
     
-    // Configurações para evitar problemas de CORS
-    const originalFetch = window.fetch;
-    window.fetch = function(url, options = {}) {
-      // Adicionar headers para evitar problemas de CORS
-      const newOptions = {
-        ...options,
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          ...options.headers,
-        },
-        mode: 'cors',
-        credentials: 'same-origin'
-      };
-      
-      // Log para debug
-      if (url.toString().includes('firestore.googleapis.com')) {
-        console.log('🔍 Firebase request:', { url, options: newOptions });
-      }
-      
-      return originalFetch(url, newOptions);
+  // Configurações para evitar problemas de CORS
+  const originalFetch = window.fetch;
+  window.fetch = function(url, options = {}) {
+    // Adicionar headers para evitar problemas de CORS
+    const newOptions = {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        ...options.headers,
+      },
+      mode: 'cors',
+      credentials: 'same-origin'
     };
     
-    // Configuração adicional para melhorar a conectividade
-    if (window.navigator && window.navigator.serviceWorker) {
-      // Registrar service worker para melhorar cache
-      window.navigator.serviceWorker.register('/firebase-messaging-sw.js')
-        .then(() => console.log('Service Worker registrado'))
-        .catch(() => console.log('Service Worker não registrado (esperado)'));
+    // Log para debug
+      if (url.toString().includes('firestore.googleapis.com')) {
+      console.log('🔍 Firebase request:', { url, options: newOptions });
     }
+    
+    return originalFetch(url, newOptions);
+  };
+  
+  // Configuração adicional para melhorar a conectividade
+  if (window.navigator && window.navigator.serviceWorker) {
+    // Registrar service worker para melhorar cache
+    window.navigator.serviceWorker.register('/firebase-messaging-sw.js')
+      .then(() => console.log('Service Worker registrado'))
+      .catch(() => console.log('Service Worker não registrado (esperado)'));
   }
+}
 }
 
 export default Platform; 

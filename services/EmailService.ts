@@ -484,44 +484,106 @@ export const EmailService = {
     
     return this.sendEmail({
       to: inviteData.email,
-      subject: `Convite para Colaborador - Obra Limpa`,
+      subject: `👷 Convite para Colaborador - Obra Limpa`,
       html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #059669;">👷 Convite de Colaborador</h2>
-          <div style="background-color: #f0fdf4; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #059669;">
-            <h3 style="color: #1f2937; margin-top: 0;">Você foi convidado!</h3>
-            <p><strong>Obra:</strong> ${inviteData.siteName}</p>
-            <p><strong>Convidado por:</strong> ${inviteData.invitedBy}</p>
-            <p><strong>Função:</strong> Colaborador</p>
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #ffffff;">
+          <!-- Header -->
+          <div style="background: linear-gradient(135deg, #059669 0%, #10B981 100%); padding: 30px; text-align: center; border-radius: 8px 8px 0 0;">
+            <h1 style="color: white; margin: 0; font-size: 28px; font-weight: bold;">👷 Convite Especial</h1>
+            <p style="color: #D1FAE5; margin: 10px 0 0 0; font-size: 16px;">Você foi convidado para ser Colaborador</p>
           </div>
-          <div style="background-color: #f8fafc; padding: 20px; border-radius: 8px; margin: 20px 0;">
-            <h4 style="color: #374151; margin-top: 0;">Como aceitar o convite:</h4>
-            <ol style="color: #6b7280; line-height: 1.6;">
-              <li>Clique no botão abaixo ou acesse o link</li>
-              <li>Complete seu cadastro como colaborador</li>
-              <li>Use o código de convite: <strong>${inviteData.inviteId}</strong></li>
-              <li>Comece a trabalhar na obra!</li>
-            </ol>
+
+          <!-- Main Content -->
+          <div style="padding: 30px; background-color: #ffffff;">
+            <div style="background-color: #F0FDF4; padding: 25px; border-radius: 12px; border-left: 5px solid #059669; margin-bottom: 25px;">
+              <h2 style="color: #065F46; margin: 0 0 15px 0; font-size: 22px;">🚀 Bem-vindo!</h2>
+              <p style="color: #6B7280; line-height: 1.6; margin: 0; font-size: 16px;">
+                Você foi selecionado para colaborar na obra <strong>${inviteData.siteName}</strong> no sistema Obra Limpa.
+                Participe da equipe, registre seu progresso e contribua para o sucesso do projeto!
+              </p>
+            </div>
+
+            <!-- Details Card -->
+            <div style="background-color: #FEFEFE; border: 1px solid #D1FAE5; border-radius: 8px; padding: 20px; margin-bottom: 25px;">
+              <h3 style="color: #047857; margin: 0 0 15px 0; font-size: 18px;">📋 Detalhes do Convite</h3>
+              <table style="width: 100%; border-collapse: collapse;">
+                <tr>
+                  <td style="padding: 8px 0; border-bottom: 1px solid #F3F4F6; color: #6B7280;"><strong>🏗️ Obra:</strong></td>
+                  <td style="padding: 8px 0; border-bottom: 1px solid #F3F4F6; color: #1F2937;">${inviteData.siteName}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 8px 0; border-bottom: 1px solid #F3F4F6; color: #6B7280;"><strong>👤 Convidado por:</strong></td>
+                  <td style="padding: 8px 0; border-bottom: 1px solid #F3F4F6; color: #1F2937;">${inviteData.invitedBy}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 8px 0; border-bottom: 1px solid #F3F4F6; color: #6B7280;"><strong>🎯 Função:</strong></td>
+                  <td style="padding: 8px 0; border-bottom: 1px solid #F3F4F6; color: #1F2937;">
+                    <span style="background-color: #D1FAE5; color: #047857; padding: 4px 8px; border-radius: 4px; font-weight: bold;">Colaborador</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 8px 0; color: #6B7280;"><strong>🔑 Código do Convite:</strong></td>
+                  <td style="padding: 8px 0; color: #1F2937; font-family: monospace; background-color: #F3F4F6; padding: 4px 8px; border-radius: 4px;">${inviteData.inviteId}</td>
+                </tr>
+              </table>
+            </div>
+
+            <!-- Benefits Section -->
+            <div style="background-color: #ECFDF5; padding: 20px; border-radius: 8px; margin-bottom: 25px;">
+              <h3 style="color: #047857; margin: 0 0 15px 0; font-size: 18px;">✨ Benefícios de ser Colaborador</h3>
+              <ul style="color: #047857; line-height: 1.8; margin: 0; padding-left: 20px;">
+                <li>Participar ativamente do progresso da obra</li>
+                <li>Registrar tarefas e atividades realizadas</li>
+                <li>Comunicação direta com a equipe</li>
+                <li>Acesso ao histórico de tarefas</li>
+                <li>Reconhecimento pelo seu trabalho</li>
+              </ul>
+            </div>
+
+            <!-- Action Button -->
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${inviteUrl}" style="
+                display: inline-block;
+                background: linear-gradient(135deg, #059669 0%, #10B981 100%);
+                color: white;
+                padding: 16px 32px;
+                text-decoration: none;
+                border-radius: 8px;
+                font-weight: bold;
+                font-size: 16px;
+                box-shadow: 0 4px 6px rgba(16, 185, 129, 0.25);
+                transition: all 0.3s ease;
+              ">
+                👷 Aceitar Convite de Colaborador
+              </a>
+            </div>
+
+            <!-- Instructions -->
+            <div style="background-color: #F8FAFC; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+              <h4 style="color: #374151; margin: 0 0 15px 0; font-size: 16px;">📝 Como aceitar o convite:</h4>
+              <ol style="color: #6b7280; line-height: 1.8; margin: 0; padding-left: 20px;">
+                <li>Clique no botão "Aceitar Convite de Colaborador" acima</li>
+                <li>Complete seu cadastro com seus dados pessoais</li>
+                <li>Use o código de convite fornecido: <strong>${inviteData.inviteId}</strong></li>
+                <li>Comece a colaborar na obra!</li>
+              </ol>
+            </div>
+
+            <!-- Alternative Link -->
+            <p style="color: #6B7280; font-size: 14px; text-align: center; margin: 20px 0;">
+              🔗 Ou acesse diretamente: <a href="${inviteUrl}" style="color: #059669; text-decoration: underline;">${inviteUrl}</a>
+            </p>
+
+            <!-- Footer -->
+            <div style="border-top: 1px solid #E5E7EB; padding-top: 20px; text-align: center;">
+              <p style="color: #9CA3AF; font-size: 12px; margin: 0;">
+                ⏰ Este convite expira em 7 dias. Se você não esperava este convite, pode ignorá-lo com segurança.
+              </p>
+              <p style="color: #9CA3AF; font-size: 12px; margin: 10px 0 0 0;">
+                🏗️ <strong>Obra Limpa</strong> - Gerenciamento inteligente de obras de construção
+              </p>
+            </div>
           </div>
-          <div style="text-align: center; margin: 30px 0;">
-            <a href="${inviteUrl}" style="
-              display: inline-block;
-              background-color: #059669;
-              color: white;
-              padding: 12px 24px;
-              text-decoration: none;
-              border-radius: 8px;
-              font-weight: bold;
-            ">
-              Aceitar Convite
-            </a>
-          </div>
-          <p style="color: #6b7280; font-size: 14px; text-align: center;">
-            Ou acesse: <a href="${inviteUrl}" style="color: #059669;">${inviteUrl}</a>
-          </p>
-          <p style="color: #6b7280; font-size: 12px; margin-top: 20px; text-align: center;">
-            Este convite expira em 7 dias. Se você não esperava este convite, pode ignorá-lo.
-          </p>
         </div>
       `
     });

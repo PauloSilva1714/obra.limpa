@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,14 +7,42 @@ import {
   StyleSheet,
   Alert,
   SafeAreaView,
+  Modal,
+  FlatList,
+  ActivityIndicator,
 } from 'react-native';
 import { router } from 'expo-router';
-import { ArrowLeft, Mail } from 'lucide-react-native';
+import { ArrowLeft, Mail, CheckCircle, Trash2 } from 'lucide-react-native';
 import { AuthService } from '@/services/AuthService';
 
 export default function InviteWorkerScreen() {
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [successEmail, setSuccessEmail] = useState('');
+  const [invites, setInvites] = useState([]);
+  const [loadingInvites, setLoadingInvites] = useState(true);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [inviteToDelete, setInviteToDelete] = useState(null);
+  const [deleting, setDeleting] = useState(false);
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [inviteToCancel, setInviteToCancel] = useState(null);
+
+  useEffect(() => {
+    loadInvites();
+  }, []);
+
+  const loadInvites = async () => {
+    setLoadingInvites(true);
+    try {
+      const invitesList = await AuthService.getInstance().getInvites();
+      setInvites(invitesList.filter((i) => i.status === 'pending'));
+    } catch (error) {
+      setInvites([]);
+    } finally {
+      setLoadingInvites(false);
+    }
+  };
 
   const handleInvite = async () => {
     if (!email.trim()) {
@@ -25,16 +53,10 @@ export default function InviteWorkerScreen() {
     setLoading(true);
     try {
       await AuthService.getInstance().sendInvite(email.trim());
-      Alert.alert(
-        'Sucesso',
-        'Convite enviado com sucesso!',
-        [
-          {
-            text: 'OK',
-            onPress: () => router.back(),
-          },
-        ]
-      );
+      setSuccessEmail(email.trim());
+      setShowSuccessModal(true);
+      setEmail('');
+      await loadInvites();
     } catch (error) {
       console.error('Erro ao enviar convite:', error);
       if (error instanceof Error) {
@@ -46,6 +68,74 @@ export default function InviteWorkerScreen() {
       setLoading(false);
     }
   };
+
+  const handleDeleteInvite = (inviteId) => {
+    setInviteToDelete(inviteId);
+    setShowDeleteModal(true);
+  };
+
+  const executeDeleteInvite = async () => {
+    if (!inviteToDelete) return;
+    setDeleting(true);
+    try {
+      await AuthService.getInstance().deleteInvite(inviteToDelete);
+      setShowDeleteModal(false);
+      setInviteToDelete(null);
+      await loadInvites();
+    } catch (error) {
+      Alert.alert('Erro', 'Não foi possível excluir o convite.');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const handleCancelInvite = (inviteId) => {
+    console.log('[handleCancelInvite] Clicou para cancelar convite:', inviteId);
+    setInviteToCancel(inviteId);
+    setShowCancelModal(true);
+    console.log('[handleCancelInvite] showCancelModal deve ser true agora');
+  };
+
+  const executeCancelInvite = async () => {
+    if (!inviteToCancel) return;
+    setDeleting(true);
+    try {
+      await AuthService.getInstance().cancelInvite(inviteToCancel);
+      setShowCancelModal(false);
+      setInviteToCancel(null);
+      await loadInvites();
+    } catch (error) {
+      Alert.alert('Erro', 'Não foi possível cancelar o convite.');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const renderInvite = ({ item }) => (
+    <View style={styles.inviteCard}>
+      <View style={styles.inviteInfo}>
+        <Mail size={18} color="#2196F3" />
+        <Text style={styles.inviteEmail}>{item.email}</Text>
+        {item.status === 'pending' ? (
+          <TouchableOpacity
+            style={styles.trashButton}
+            onPress={() => handleCancelInvite(item.id)}
+          >
+            <Trash2 size={20} color="#DC2626" />
+          </TouchableOpacity>
+        ) : item.status === 'rejected' ? (
+          <TouchableOpacity
+            style={styles.trashButton}
+            onPress={() => handleDeleteInvite(item.id)}
+          >
+            <Trash2 size={20} color="#DC2626" />
+          </TouchableOpacity>
+        ) : null}
+      </View>
+      <Text style={styles.inviteStatus}>Status: {item.status === 'pending' ? 'Pendente' : item.status === 'rejected' ? 'Cancelado' : item.status}</Text>
+      <Text style={styles.inviteDate}>Enviado em: {new Date(item.createdAt?.seconds ? item.createdAt.seconds * 1000 : item.createdAt).toLocaleString('pt-BR')}</Text>
+    </View>
+  );
 
   return (
     <SafeAreaView style={styles.container}>
@@ -89,6 +179,144 @@ export default function InviteWorkerScreen() {
           </Text>
         </TouchableOpacity>
       </View>
+
+      {/* Lista de Convites Enviados */}
+      <View style={styles.invitesListContainer}>
+        <Text style={styles.sectionTitle}>Convites Enviados</Text>
+        {loadingInvites ? (
+          <ActivityIndicator size="small" color="#2196F3" />
+        ) : invites.length === 0 ? (
+          <Text style={styles.emptyText}>Nenhum convite enviado.</Text>
+        ) : (
+          <FlatList
+            data={invites}
+            keyExtractor={(item) => item.id}
+            renderItem={renderInvite}
+            contentContainerStyle={{ paddingBottom: 24 }}
+          />
+        )}
+      </View>
+
+      {/* Modal de Sucesso */}
+      <Modal
+        visible={showSuccessModal}
+        animationType="fade"
+        transparent={true}
+        onRequestClose={() => setShowSuccessModal(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.successModalContent}>
+            <View style={styles.successIconContainer}>
+              <CheckCircle size={48} color="#10B981" />
+            </View>
+            <Text style={styles.successTitle}>Convite enviado com sucesso!</Text>
+            <Text style={styles.successEmail}>{successEmail}</Text>
+            <Text style={styles.successDescription}>
+              O colaborador receberá um e-mail com as instruções para acessar o sistema.
+            </Text>
+            <TouchableOpacity
+              style={styles.successButton}
+              onPress={() => {
+                setShowSuccessModal(false);
+                router.back();
+              }}
+            >
+              <Text style={styles.successButtonText}>OK</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal de Exclusão */}
+      <Modal
+        visible={showDeleteModal}
+        animationType="fade"
+        transparent={true}
+        onRequestClose={() => {
+          if (!deleting) {
+            setShowDeleteModal(false);
+            setInviteToDelete(null);
+          }
+        }}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.successModalContent}>
+            <Text style={styles.successTitle}>Excluir Convite</Text>
+            <Text style={styles.successDescription}>
+              Tem certeza que deseja excluir este convite? Esta ação não pode ser desfeita.
+            </Text>
+            <View style={{ flexDirection: 'row', gap: 12 }}>
+              <TouchableOpacity
+                style={[styles.successButton, { backgroundColor: '#6B7280' }]}
+                onPress={() => {
+                  setShowDeleteModal(false);
+                  setInviteToDelete(null);
+                }}
+                disabled={deleting}
+              >
+                <Text style={styles.successButtonText}>Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.successButton, { backgroundColor: '#DC2626' }]}
+                onPress={executeDeleteInvite}
+                disabled={deleting}
+              >
+                {deleting ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <Text style={styles.successButtonText}>Excluir</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal de Cancelamento */}
+      {console.log('[JSX] Renderizando Modal de Cancelamento:', showCancelModal, inviteToCancel)}
+      <Modal
+        visible={showCancelModal}
+        animationType="fade"
+        transparent={true}
+        onRequestClose={() => {
+          if (!deleting) {
+            setShowCancelModal(false);
+            setInviteToCancel(null);
+          }
+        }}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.successModalContent}>
+            <Text style={styles.successTitle}>Cancelar Convite</Text>
+            <Text style={styles.successDescription}>
+              Tem certeza que deseja cancelar este convite? O colaborador não poderá mais aceitar.
+            </Text>
+            <View style={{ flexDirection: 'row', gap: 12 }}>
+              <TouchableOpacity
+                style={[styles.successButton, { backgroundColor: '#6B7280' }]}
+                onPress={() => {
+                  setShowCancelModal(false);
+                  setInviteToCancel(null);
+                }}
+                disabled={deleting}
+              >
+                <Text style={styles.successButtonText}>Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.successButton, { backgroundColor: '#DC2626' }]}
+                onPress={executeCancelInvite}
+                disabled={deleting}
+              >
+                {deleting ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <Text style={styles.successButtonText}>Sim, Cancelar</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -161,5 +389,110 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  modalContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  successModalContent: {
+    backgroundColor: 'white',
+    padding: 24,
+    borderRadius: 16,
+    width: '85%',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  successIconContainer: {
+    marginBottom: 16,
+  },
+  successTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  successEmail: {
+    fontSize: 18,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  successDescription: {
+    fontSize: 14,
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 24,
+  },
+  successButton: {
+    backgroundColor: '#10B981',
+    paddingVertical: 12,
+    paddingHorizontal: 32,
+    borderRadius: 8,
+    minWidth: 100,
+    alignItems: 'center',
+  },
+  successButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  invitesListContainer: {
+    padding: 16,
+    backgroundColor: '#fff',
+    borderTopWidth: 1,
+    borderTopColor: '#e0e0e0',
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 12,
+  },
+  inviteCard: {
+    backgroundColor: '#F3F4F6',
+    borderRadius: 10,
+    padding: 14,
+    marginBottom: 12,
+    flexDirection: 'column',
+    elevation: 2,
+  },
+  inviteInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  inviteEmail: {
+    fontSize: 16,
+    fontWeight: '500',
+    marginLeft: 8,
+    flex: 1,
+  },
+  trashButton: {
+    padding: 6,
+    borderRadius: 6,
+    backgroundColor: 'transparent',
+  },
+  inviteStatus: {
+    fontSize: 13,
+    color: '#6B7280',
+    marginBottom: 2,
+  },
+  inviteDate: {
+    fontSize: 12,
+    color: '#9CA3AF',
+  },
+  emptyText: {
+    fontSize: 16,
+    fontWeight: '500',
+    textAlign: 'center',
+    color: '#6B7280',
   },
 }); 

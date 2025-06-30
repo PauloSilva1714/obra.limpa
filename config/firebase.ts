@@ -61,7 +61,7 @@ try {
     console.log('✅ Firestore inicializado com configuração web agressiva');
   } else {
     // Para mobile, usar configuração padrão
-    db = getFirestore(app);
+  db = getFirestore(app);
     console.log('✅ Firestore inicializado com configuração padrão');
   }
   
@@ -121,7 +121,7 @@ export const isFirestoreOnline = async (): Promise<boolean> => {
     
     // Estratégia 1: Verificação simples - apenas criar referência
     try {
-      const testDocRef = doc(db, 'system', 'online-test');
+    const testDocRef = doc(db, 'system', 'online-test');
       if (testDocRef) {
         console.log('✅ Firestore está online (referência criada com sucesso)');
         return true;
@@ -133,42 +133,42 @@ export const isFirestoreOnline = async (): Promise<boolean> => {
     // Estratégia 2: Tentar uma operação real com timeout curto
     try {
       const testDocRef = doc(db, 'system', 'online-test');
-      const timeoutPromise = new Promise((_, reject) => {
+    const timeoutPromise = new Promise((_, reject) => {
         setTimeout(() => reject(new Error('Timeout')), 3000); // 3 segundos
-      });
-      
-      const getDocPromise = getDoc(testDocRef);
-      await Promise.race([getDocPromise, timeoutPromise]);
-      
+    });
+    
+    const getDocPromise = getDoc(testDocRef);
+    await Promise.race([getDocPromise, timeoutPromise]);
+    
       console.log('✅ Firestore está online (operação bem-sucedida)');
-      return true;
-    } catch (error: any) {
-      const errorMessage = error.message || '';
-      const errorCode = error.code || '';
-      
-      console.log('🔍 Erro na verificação de online:', { errorCode, errorMessage });
-      
+    return true;
+  } catch (error: any) {
+    const errorMessage = error.message || '';
+    const errorCode = error.code || '';
+    
+    console.log('🔍 Erro na verificação de online:', { errorCode, errorMessage });
+    
       // Se for erro de permissão ou "not found", significa que está online
       if (errorMessage.includes('permission') || errorMessage.includes('not found')) {
         console.log('✅ Firestore está online (erro esperado de permissão/not found)');
-        return true;
-      }
-      
-      // Se for erro de timeout, pode ser problema de rede
-      if (errorMessage.includes('Timeout')) {
-        console.log('⚠️ Timeout na verificação de online');
-        return false;
-      }
-      
-      // Se for erro de "unavailable", está offline
-      if (errorCode === 'unavailable' || errorMessage.includes('unavailable') || errorMessage.includes('offline')) {
-        console.log('❌ Firestore está offline');
-        return false;
-      }
-      
-      // Para outros erros, assumir que está online (mais tolerante)
-      console.log('⚠️ Erro desconhecido, assumindo que está online:', errorMessage);
       return true;
+    }
+    
+    // Se for erro de timeout, pode ser problema de rede
+    if (errorMessage.includes('Timeout')) {
+      console.log('⚠️ Timeout na verificação de online');
+      return false;
+    }
+    
+    // Se for erro de "unavailable", está offline
+      if (errorCode === 'unavailable' || errorMessage.includes('unavailable') || errorMessage.includes('offline')) {
+      console.log('❌ Firestore está offline');
+      return false;
+    }
+    
+    // Para outros erros, assumir que está online (mais tolerante)
+    console.log('⚠️ Erro desconhecido, assumindo que está online:', errorMessage);
+    return true;
     }
     
   } catch (error: any) {

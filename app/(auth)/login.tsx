@@ -86,9 +86,14 @@ export default function LoginScreen() {
       console.log('Resultado do login:', success);
 
       if (success) {
-        await AuthService.setCurrentSite(null);
-        console.log('Redirecionando para seleção de canteiro');
-        router.replace('/(auth)/site-selection');
+        const user = await AuthService.getCurrentUser();
+        if (user && user.role === 'worker') {
+          router.replace('/colaborador');
+        } else {
+          await AuthService.setCurrentSite(null);
+          console.log('Redirecionando para seleção de canteiro');
+          router.replace('/(auth)/site-selection');
+        }
       } else {
         Alert.alert('Erro', 'Credenciais inválidas. Tente novamente.');
       }

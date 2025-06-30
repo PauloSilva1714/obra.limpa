@@ -13,6 +13,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
@@ -27,8 +28,18 @@ import {
   MessageCircle,
   Send,
   MapPin,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react-native';
 import { Feather } from '@expo/vector-icons';
+import { GestureHandlerRootView, PinchGestureHandler } from 'react-native-gesture-handler';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  useAnimatedGestureHandler,
+  withSpring,
+  runOnJS,
+} from 'react-native-reanimated';
 import taskService, { Task, Comment, TaskService } from '@/services/TaskService';
 import { AuthService } from '@/services/AuthService';
 import { EmailService } from '@/services/EmailService';
@@ -55,6 +66,16 @@ export default function TasksScreen() {
   const [newComment, setNewComment] = useState('');
   const [currentUser, setCurrentUser] = useState<any>(null);
 
+  // Estados para pesquisa
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filteredTasks, setFilteredTasks] = useState<Task[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+
+  // Estados para modal de foto
+  const [photoModalVisible, setPhotoModalVisible] = useState(false);
+  const [selectedTaskForPhoto, setSelectedTaskForPhoto] = useState<Task | null>(null);
+  const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
+
   useEffect(() => {
     if (isInitialized) return;
 
@@ -77,11 +98,21 @@ export default function TasksScreen() {
     initializeScreen();
   }, [isInitialized]);
 
+  // Atualizar tarefas filtradas quando as tarefas mudarem
+  useEffect(() => {
+    if (searchQuery.trim()) {
+      filterTasks(searchQuery);
+    } else {
+      setFilteredTasks(tasks);
+    }
+  }, [tasks, searchQuery]);
+
   const loadTasks = async () => {
     try {
       const siteTasks = await taskService.getTasks();
       console.log('Tarefas carregadas:', siteTasks);
       setTasks(siteTasks);
+      setFilteredTasks(siteTasks);
     } catch (error) {
       console.error('Erro ao carregar tarefas:', error);
       Alert.alert(t('error'), 'Erro ao carregar tarefas.');
@@ -327,6 +358,68 @@ export default function TasksScreen() {
     }
   };
 
+  // Função para filtrar tarefas
+  const filterTasks = (query: string) => {
+    if (!query.trim()) {
+      setFilteredTasks(tasks);
+      setIsSearching(false);
+      return;
+    }
+
+    setIsSearching(true);
+    const lowerQuery = query.toLowerCase();
+    
+    const filtered = tasks.filter(task => {
+      const title = task.title?.toLowerCase() || '';
+      const description = task.description?.toLowerCase() || '';
+      const assignedTo = task.assignedTo?.toLowerCase() || '';
+      const area = task.area?.toLowerCase() || '';
+      
+      return title.includes(lowerQuery) ||
+             description.includes(lowerQuery) ||
+             assignedTo.includes(lowerQuery) ||
+             area.includes(lowerQuery);
+    });
+    
+    setFilteredTasks(filtered);
+  };
+
+  // Função para limpar pesquisa
+  const clearSearch = () => {
+    setSearchQuery('');
+    setFilteredTasks(tasks);
+    setIsSearching(false);
+  };
+
+  // Funções para modal de foto
+  const handleOpenPhotoModal = (task: Task) => {
+    setSelectedTaskForPhoto(task);
+    setCurrentPhotoIndex(0);
+    setPhotoModalVisible(true);
+  };
+
+  const handleClosePhotoModal = () => {
+    setPhotoModalVisible(false);
+    setSelectedTaskForPhoto(null);
+    setCurrentPhotoIndex(0);
+  };
+
+  const handleNextPhoto = () => {
+    if (selectedTaskForPhoto?.photos && currentPhotoIndex < selectedTaskForPhoto.photos.length - 1) {
+      setCurrentPhotoIndex(currentPhotoIndex + 1);
+    }
+  };
+
+  const handlePreviousPhoto = () => {
+    if (currentPhotoIndex > 0) {
+      setCurrentPhotoIndex(currentPhotoIndex - 1);
+    }
+  };
+
+  const handlePhotoPress = (index: number) => {
+    setCurrentPhotoIndex(index);
+  };
+
   const renderTaskItem = ({ item }: { item: Task }) => (
     <View style={[styles.taskCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
       {/* Header do Card */}
@@ -345,30 +438,41 @@ export default function TasksScreen() {
           </View>
         </View>
         <View style={styles.statusContainer}>
-          {getStatusIcon(item.status)}
-          <Text style={[styles.statusText, { color: colors.textSecondary }]}>
-            {getStatusText(item.status)}
-          </Text>
-        </View>
-      </View>
+              {getStatusIcon(item.status)}
+              <Text style={[styles.statusText, { color: colors.textSecondary }]}>
+                {getStatusText(item.status)}
+              </Text>
+            </View>
+          </View>
 
       {/* Foto Principal */}
       {item.photos && item.photos.length > 0 && (
-        <View style={styles.imageContainer}>
+              <TouchableOpacity
+          style={styles.imageContainer}
+          onPress={() => handleOpenPhotoModal(item)}
+          activeOpacity={0.9}
+        >
           <Image
             source={{ uri: item.photos[0] }}
             style={styles.mainImage}
             resizeMode="cover"
           />
-        </View>
-      )}
+          {item.photos.length > 1 && (
+            <View style={styles.photoIndicator}>
+              <Text style={styles.photoIndicatorText}>
+                +{item.photos.length - 1}
+              </Text>
+            </View>
+          )}
+              </TouchableOpacity>
+            )}
 
       {/* Informações da Tarefa */}
       <View style={styles.taskInfo}>
         <Text style={[styles.taskTitle, { color: colors.text }]} numberOfLines={2}>
           {item.title}
         </Text>
-        
+
         {item.description && (
           <Text style={[styles.taskDescription, { color: colors.textSecondary }]} numberOfLines={3}>
             {item.description}
@@ -410,7 +514,7 @@ export default function TasksScreen() {
           </Text>
           <TouchableOpacity onPress={() => handleOpenComments(item)}>
             <MessageCircle size={16} color={colors.primary} />
-          </TouchableOpacity>
+      </TouchableOpacity>
         </View>
         
         {item.comments && item.comments.length > 0 && (
@@ -449,12 +553,12 @@ export default function TasksScreen() {
 
       {/* Ações do Card */}
       <View style={styles.cardActions}>
-        <TouchableOpacity
+      <TouchableOpacity
           style={[styles.actionButton, { backgroundColor: colors.primary + '20' }]}
-          onPress={() => handleTaskDetails(item)}
-        >
+        onPress={() => handleTaskDetails(item)}
+      >
           <Text style={[styles.actionButtonText, { color: colors.primary }]}>Ver Detalhes</Text>
-        </TouchableOpacity>
+      </TouchableOpacity>
         
         {userRole === 'admin' && (
           <TouchableOpacity
@@ -496,9 +600,36 @@ export default function TasksScreen() {
         )}
       </View>
 
+      {/* Campo de Pesquisa */}
+      <View style={[styles.searchContainer, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+        <View style={[styles.searchInputContainer, { backgroundColor: colors.background, borderColor: colors.border }]}>
+          <Feather name="search" size={16} color={colors.textMuted} style={styles.searchIcon} />
+          <TextInput
+            style={[styles.searchInput, { color: colors.text }]}
+            placeholder="Pesquisar tarefas..."
+            placeholderTextColor={colors.textMuted}
+            value={searchQuery}
+            onChangeText={(text) => {
+              setSearchQuery(text);
+              filterTasks(text);
+            }}
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={clearSearch} style={styles.clearButton}>
+              <X size={16} color={colors.textMuted} />
+            </TouchableOpacity>
+          )}
+        </View>
+        {isSearching && (
+          <Text style={[styles.searchResults, { color: colors.textSecondary }]}>
+            {filteredTasks.length} resultado{filteredTasks.length !== 1 ? 's' : ''} encontrado{filteredTasks.length !== 1 ? 's' : ''}
+          </Text>
+        )}
+      </View>
+
       {/* Feed de Tarefas */}
       <FlatList
-        data={tasks}
+        data={filteredTasks}
         renderItem={renderTaskItem}
         keyExtractor={(item) => item.id}
         style={styles.feedList}
@@ -514,14 +645,25 @@ export default function TasksScreen() {
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-              Nenhuma tarefa encontrada
+              {isSearching 
+                ? `Nenhuma tarefa encontrada para "${searchQuery}"`
+                : 'Nenhuma tarefa encontrada'
+              }
             </Text>
-            {userRole === 'admin' && (
+            {!isSearching && userRole === 'admin' && (
               <TouchableOpacity
                 style={[styles.emptyButton, { backgroundColor: colors.primary }]}
                 onPress={handleCreateTask}
               >
                 <Text style={styles.emptyButtonText}>Criar primeira tarefa</Text>
+              </TouchableOpacity>
+            )}
+            {isSearching && (
+              <TouchableOpacity
+                style={[styles.emptyButton, { backgroundColor: colors.primary }]}
+                onPress={clearSearch}
+              >
+                <Text style={styles.emptyButtonText}>Limpar pesquisa</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -598,13 +740,28 @@ export default function TasksScreen() {
                 value={newComment}
                 onChangeText={setNewComment}
                 multiline
+                onSubmitEditing={() => {
+                  if (newComment.trim()) handleAddComment();
+                }}
+                blurOnSubmit={false}
+                returnKeyType="send"
               />
               <TouchableOpacity
-                style={[styles.sendButton, { backgroundColor: colors.primary }]}
+                style={[
+                  styles.sendButton,
+                  { backgroundColor: newComment.trim() ? colors.primary : colors.textMuted + '30',
+                    transform: [{ scale: newComment.trim() ? 1.1 : 1 }],
+                    shadowColor: newComment.trim() ? colors.primary : 'transparent',
+                    shadowOpacity: newComment.trim() ? 0.3 : 0,
+                    shadowRadius: 6,
+                    shadowOffset: { width: 0, height: 2 },
+                  }
+                ]}
                 onPress={handleAddComment}
                 disabled={!newComment.trim()}
+                activeOpacity={0.7}
               >
-                <Send size={16} color="#FFFFFF" />
+                <Send size={22} color="#FFFFFF" style={{ opacity: newComment.trim() ? 1 : 0.5 }} />
               </TouchableOpacity>
             </View>
           </View>
@@ -644,6 +801,145 @@ export default function TasksScreen() {
               </TouchableOpacity>
             </View>
           </View>
+        </View>
+      </Modal>
+
+      {/* Photo Modal - Instagram Style */}
+      <Modal
+        visible={photoModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={handleClosePhotoModal}
+      >
+        <View style={styles.photoModalOverlay}>
+          {/* Header do Modal */}
+          <View style={styles.photoModalHeader}>
+            <TouchableOpacity onPress={handleClosePhotoModal} style={styles.photoCloseButton}>
+              <X size={24} color="#FFFFFF" />
+            </TouchableOpacity>
+            <Text style={styles.photoModalTitle}>
+              {selectedTaskForPhoto?.title}
+            </Text>
+            <View style={styles.photoCounter}>
+              <Text style={styles.photoCounterText}>
+                {currentPhotoIndex + 1} / {selectedTaskForPhoto?.photos?.length || 1}
+              </Text>
+            </View>
+          </View>
+
+          {/* Área da Foto Principal */}
+          <View style={styles.photoMainContainer}>
+            {selectedTaskForPhoto?.photos && selectedTaskForPhoto.photos.length > 0 && (
+              <Image
+                source={{ uri: selectedTaskForPhoto.photos[currentPhotoIndex] }}
+                style={styles.photoMainImage}
+                resizeMode="contain"
+              />
+            )}
+            
+            {/* Navegação entre fotos */}
+            {selectedTaskForPhoto?.photos && selectedTaskForPhoto.photos.length > 1 && (
+              <>
+                <TouchableOpacity
+                  style={[styles.photoNavButton, styles.photoNavLeft]}
+                  onPress={handlePreviousPhoto}
+                  disabled={currentPhotoIndex === 0}
+                >
+                  <ChevronLeft size={24} color="#FFFFFF" />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.photoNavButton, styles.photoNavRight]}
+                  onPress={handleNextPhoto}
+                  disabled={currentPhotoIndex === selectedTaskForPhoto.photos.length - 1}
+                >
+                  <ChevronRight size={24} color="#FFFFFF" />
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+
+          {/* Informações da Tarefa */}
+          <View style={styles.photoTaskInfo}>
+            <View style={styles.photoTaskHeader}>
+              <View style={styles.photoUserInfo}>
+                <View style={styles.photoAvatar}>
+                  <User size={16} color="#FFFFFF" />
+                </View>
+                <View>
+                  <Text style={styles.photoUserName}>
+                    {formatUserName(selectedTaskForPhoto?.assignedTo || '')}
+                  </Text>
+                  <Text style={styles.photoTaskDate}>
+                    {selectedTaskForPhoto?.createdAt ? formatCommentDateTime(selectedTaskForPhoto.createdAt) : ''}
+                  </Text>
+                </View>
+              </View>
+              <View style={styles.photoStatusContainer}>
+                {selectedTaskForPhoto && getStatusIcon(selectedTaskForPhoto.status)}
+                <Text style={styles.photoStatusText}>
+                  {selectedTaskForPhoto ? getStatusText(selectedTaskForPhoto.status) : ''}
+                </Text>
+              </View>
+            </View>
+
+            {selectedTaskForPhoto?.description && (
+              <Text style={styles.photoTaskDescription} numberOfLines={3}>
+                {selectedTaskForPhoto.description}
+              </Text>
+            )}
+
+            <View style={styles.photoTaskDetails}>
+              {selectedTaskForPhoto?.area && (
+                <View style={styles.photoDetailItem}>
+                  <MapPin size={14} color="#FFFFFF" />
+                  <Text style={styles.photoDetailText} numberOfLines={1}>
+                    {selectedTaskForPhoto.area}
+                  </Text>
+                </View>
+              )}
+              
+              {selectedTaskForPhoto?.dueDate && (
+                <View style={styles.photoDetailItem}>
+                  <Calendar size={14} color="#FFFFFF" />
+                  <Text style={styles.photoDetailText}>
+                    {new Date(selectedTaskForPhoto.dueDate).toLocaleDateString('pt-BR')}
+                  </Text>
+                </View>
+              )}
+            </View>
+
+            {selectedTaskForPhoto && (
+              <View style={[styles.photoPriorityBadge, { backgroundColor: getPriorityColor(selectedTaskForPhoto.priority) + '20' }]}>
+                <Text style={[styles.photoPriorityText, { color: getPriorityColor(selectedTaskForPhoto.priority) }]}>
+                  {selectedTaskForPhoto.priority === 'high' ? t('high') : selectedTaskForPhoto.priority === 'medium' ? t('medium') : t('low')}
+                </Text>
+              </View>
+            )}
+          </View>
+
+          {/* Miniaturas das Fotos */}
+          {selectedTaskForPhoto?.photos && selectedTaskForPhoto.photos.length > 1 && (
+            <View style={styles.photoThumbnailsContainer}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                {selectedTaskForPhoto.photos.map((photo, index) => (
+                  <TouchableOpacity
+                    key={index}
+                    style={[
+                      styles.photoThumbnail,
+                      index === currentPhotoIndex && styles.photoThumbnailActive
+                    ]}
+                    onPress={() => handlePhotoPress(index)}
+                  >
+                    <Image
+                      source={{ uri: photo }}
+                      style={styles.photoThumbnailImage}
+                      resizeMode="cover"
+                    />
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          )}
         </View>
       </Modal>
     </SafeAreaView>
@@ -1032,5 +1328,215 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: 'Inter-SemiBold',
     marginBottom: 4,
+  },
+  searchContainer: {
+    padding: 16,
+    borderBottomWidth: 1,
+  },
+  searchInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 4,
+  },
+  searchIcon: {
+    marginHorizontal: 12,
+  },
+  searchInput: {
+    flex: 1,
+    paddingVertical: 12,
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+  },
+  clearButton: {
+    padding: 8,
+    marginRight: 4,
+  },
+  searchResults: {
+    fontSize: 12,
+    fontFamily: 'Inter-Regular',
+    marginTop: 8,
+  },
+  photoIndicator: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    borderRadius: 12,
+    padding: 2,
+  },
+  photoIndicatorText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontFamily: 'Inter-SemiBold',
+  },
+  photoModalOverlay: {
+    flex: 1,
+    backgroundColor: '#000000',
+  },
+  photoModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingTop: 60,
+    paddingBottom: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+  },
+  photoCloseButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  photoModalTitle: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontFamily: 'Inter-SemiBold',
+    flex: 1,
+    textAlign: 'center',
+    marginHorizontal: 20,
+  },
+  photoCounter: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  photoCounterText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontFamily: 'Inter-Medium',
+  },
+  photoMainContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'relative',
+  },
+  photoMainImage: {
+    width: '100%',
+    height: '100%',
+  },
+  photoNavButton: {
+    position: 'absolute',
+    top: '50%',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: -22,
+  },
+  photoNavLeft: {
+    left: 20,
+  },
+  photoNavRight: {
+    right: 20,
+  },
+  photoTaskInfo: {
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    padding: 20,
+  },
+  photoTaskHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  photoUserInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  photoAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  photoUserName: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontFamily: 'Inter-SemiBold',
+    marginBottom: 2,
+  },
+  photoTaskDate: {
+    color: '#CCCCCC',
+    fontSize: 12,
+    fontFamily: 'Inter-Regular',
+  },
+  photoStatusContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  photoStatusText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontFamily: 'Inter-Medium',
+  },
+  photoTaskDescription: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    lineHeight: 20,
+    marginBottom: 12,
+  },
+  photoTaskDetails: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    marginBottom: 12,
+  },
+  photoDetailItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    flex: 1,
+  },
+  photoDetailText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontFamily: 'Inter-Regular',
+  },
+  photoPriorityBadge: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  photoPriorityText: {
+    fontSize: 10,
+    fontFamily: 'Inter-SemiBold',
+    textTransform: 'uppercase',
+  },
+  photoThumbnailsContainer: {
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+  },
+  photoThumbnail: {
+    width: 60,
+    height: 60,
+    borderRadius: 8,
+    marginRight: 8,
+    borderWidth: 2,
+    borderColor: 'transparent',
+    overflow: 'hidden',
+  },
+  photoThumbnailActive: {
+    borderColor: '#FFFFFF',
+  },
+  photoThumbnailImage: {
+    width: '100%',
+    height: '100%',
   },
 });

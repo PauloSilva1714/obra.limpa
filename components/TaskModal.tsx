@@ -188,38 +188,20 @@ export function TaskModal({ visible, task, userRole, onSave, onClose, detailsMod
         input.accept = 'image/*';
         input.multiple = true;
         input.onchange = async (e: Event) => {
-          try {
-            const files = (e.target as HTMLInputElement).files;
-            if (files) {
-              const uploadedUrls: string[] = [];
-              
-              for (const file of Array.from(files)) {
-                try {
-                  console.log('🔄 Processando arquivo:', file.name);
-                  
-                  // Em desenvolvimento web, usar URLs locais temporárias
-                  // para evitar problemas de CORS com Firebase Storage
-                  const localUrl = URL.createObjectURL(file);
-                  console.log('✅ URL local criada:', localUrl);
-                  
-                  uploadedUrls.push(localUrl);
-                } catch (uploadError) {
-                  console.error('❌ Erro no processamento do arquivo:', file.name, uploadError);
-                  Alert.alert('Erro', `Não foi possível processar ${file.name}. Tente novamente.`);
-                }
-              }
-              
-              if (uploadedUrls.length > 0) {
-                setFormData(prev => ({
-                  ...prev,
-                  photos: [...prev.photos, ...uploadedUrls]
-                }));
-                console.log('✅ Imagens adicionadas:', uploadedUrls.length);
-              }
+          const files = (e.target as HTMLInputElement).files;
+          if (files) {
+            const uploadedUrls: string[] = [];
+            const user = await AuthService.getCurrentUser();
+            for (const file of Array.from(files)) {
+              const url = await uploadImageAsync(file, user?.id || 'anon');
+              uploadedUrls.push(url);
             }
-          } catch (error) {
-            console.error('❌ Erro ao processar arquivos:', error);
-            Alert.alert('Erro', 'Não foi possível processar as imagens selecionadas.');
+            if (uploadedUrls.length > 0) {
+              setFormData(prev => ({
+                ...prev,
+                photos: [...prev.photos, ...uploadedUrls]
+              }));
+            }
           }
         };
         input.click();
@@ -260,18 +242,23 @@ export function TaskModal({ visible, task, userRole, onSave, onClose, detailsMod
         input.type = 'file';
         input.accept = 'video/*';
         input.multiple = true;
-        
-        input.onchange = (e: Event) => {
+        input.onchange = async (e: Event) => {
           const files = (e.target as HTMLInputElement).files;
           if (files) {
-            const newVideos = Array.from(files).map(file => URL.createObjectURL(file));
-            setFormData(prev => ({
-              ...prev,
-              videos: [...prev.videos, ...newVideos]
-            }));
+            const uploadedUrls: string[] = [];
+            const user = await AuthService.getCurrentUser();
+            for (const file of Array.from(files)) {
+              const url = await uploadImageAsync(file, user?.id || 'anon');
+              uploadedUrls.push(url);
+            }
+            if (uploadedUrls.length > 0) {
+              setFormData(prev => ({
+                ...prev,
+                videos: [...prev.videos, ...uploadedUrls]
+              }));
+            }
           }
         };
-        
         input.click();
         return;
       }
