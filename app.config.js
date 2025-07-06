@@ -21,6 +21,7 @@ module.exports = {
       storageBucket: "bralimpa2.firebasestorage.app",
       messagingSenderId: "127747660506",
       appId: "1:127747660506:web:b1d89516a0bc22698de3e3"
-    }
+    },
+    EXPO_GOOGLE_PLACES_API_KEY: "AIzaSyBer6x1O4RAlrkHw8HYhh-lRgrbKlnocEA"
   }
 }; 

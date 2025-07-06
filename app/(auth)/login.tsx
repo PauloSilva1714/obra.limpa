@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -32,6 +32,8 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [fadeAnim] = useState(new Animated.Value(0));
   const [slideAnim] = useState(new Animated.Value(50));
+
+  const passwordInputRef = useRef<TextInput>(null);
 
   const [fontsLoaded, fontError] = useFonts({
     'Inter-Regular': Inter_400Regular,
@@ -88,7 +90,12 @@ export default function LoginScreen() {
       if (success) {
         const user = await AuthService.getCurrentUser();
         if (user && user.role === 'worker') {
-          router.replace('/colaborador');
+          const currentSite = await AuthService.getCurrentSite();
+          if (!currentSite || !currentSite.id) {
+            router.replace('/(auth)/site-selection');
+          } else {
+            router.replace('/(tabs)/index');
+          }
         } else {
           await AuthService.setCurrentSite(null);
           console.log('Redirecionando para seleção de canteiro');
@@ -156,6 +163,8 @@ export default function LoginScreen() {
                 keyboardType="email-address"
                 autoCapitalize="none"
                 placeholderTextColor="#9CA3AF"
+                returnKeyType="next"
+                onSubmitEditing={() => passwordInputRef.current?.focus()}
               />
             </View>
 
@@ -163,12 +172,14 @@ export default function LoginScreen() {
             <View style={styles.inputContainer}>
               <Lock size={20} color="#6B7280" style={styles.inputIcon} />
               <TextInput
+                ref={passwordInputRef}
                 style={styles.input}
                 placeholder="Digite sua senha"
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry={!showPassword}
                 placeholderTextColor="#9CA3AF"
+                onSubmitEditing={handleLogin}
               />
               <TouchableOpacity
                 onPress={() => setShowPassword(!showPassword)}

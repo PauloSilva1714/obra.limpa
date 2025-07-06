@@ -38,6 +38,6 @@ export default function Index() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F97316',
+    backgroundColor: '#ffff',
   },
 });

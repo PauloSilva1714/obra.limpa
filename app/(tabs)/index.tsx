@@ -30,6 +30,7 @@ import {
   MapPin,
   ChevronLeft,
   ChevronRight,
+  Eye,
 } from 'lucide-react-native';
 import { Feather } from '@expo/vector-icons';
 import { GestureHandlerRootView, PinchGestureHandler } from 'react-native-gesture-handler';
@@ -46,6 +47,7 @@ import { EmailService } from '@/services/EmailService';
 import { TaskModal } from '@/components/TaskModal';
 import { useTheme } from '@/contexts/ThemeContext';
 import { t } from '@/config/i18n';
+import { Video, ResizeMode } from 'expo-av';
 
 export default function TasksScreen() {
   const { colors } = useTheme();
@@ -438,34 +440,35 @@ export default function TasksScreen() {
           </View>
         </View>
         <View style={styles.statusContainer}>
-              {getStatusIcon(item.status)}
-              <Text style={[styles.statusText, { color: colors.textSecondary }]}>
-                {getStatusText(item.status)}
-              </Text>
-            </View>
-          </View>
+          {getStatusIcon(item.status)}
+          <Text style={[styles.statusText, { color: colors.textSecondary }]}>
+            {getStatusText(item.status)}
+          </Text>
+        </View>
+      </View>
 
-      {/* Foto Principal */}
-      {item.photos && item.photos.length > 0 && (
-              <TouchableOpacity
-          style={styles.imageContainer}
-          onPress={() => handleOpenPhotoModal(item)}
-          activeOpacity={0.9}
-        >
-          <Image
-            source={{ uri: item.photos[0] }}
-            style={styles.mainImage}
-            resizeMode="cover"
-          />
-          {item.photos.length > 1 && (
-            <View style={styles.photoIndicator}>
-              <Text style={styles.photoIndicatorText}>
-                +{item.photos.length - 1}
-              </Text>
-            </View>
-          )}
-              </TouchableOpacity>
-            )}
+      {/* Mídia em destaque */}
+      {item.photos && item.photos.length > 0 ? (
+        <Image
+          source={{ uri: item.photos[0] }}
+          style={styles.igCardMedia}
+          resizeMode="cover"
+        />
+      ) : (
+        <View style={[styles.igCardMedia, { justifyContent: 'center', alignItems: 'center' }]}> 
+          <Text style={{ color: '#888' }}>Sem mídia</Text>
+        </View>
+      )}
+
+      {/* Ícones abaixo da mídia */}
+      <View style={styles.igCardActions}>
+        <TouchableOpacity onPress={() => handleOpenComments(item)}>
+          <MessageCircle size={24} color={colors.primary} />
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => handleTaskDetails(item)} style={{ marginLeft: 16 }}>
+          <Eye size={24} color={colors.primary} />
+        </TouchableOpacity>
+      </View>
 
       {/* Informações da Tarefa */}
       <View style={styles.taskInfo}>
@@ -512,9 +515,6 @@ export default function TasksScreen() {
           <Text style={[styles.commentsTitle, { color: colors.text }]}>
             Comentários ({item.comments?.length || 0})
           </Text>
-          <TouchableOpacity onPress={() => handleOpenComments(item)}>
-            <MessageCircle size={16} color={colors.primary} />
-      </TouchableOpacity>
         </View>
         
         {item.comments && item.comments.length > 0 && (
@@ -551,27 +551,18 @@ export default function TasksScreen() {
         )}
       </View>
 
-      {/* Ações do Card */}
-      <View style={styles.cardActions}>
-      <TouchableOpacity
-          style={[styles.actionButton, { backgroundColor: colors.primary + '20' }]}
-        onPress={() => handleTaskDetails(item)}
-      >
-          <Text style={[styles.actionButtonText, { color: colors.primary }]}>Ver Detalhes</Text>
-      </TouchableOpacity>
-        
-        {userRole === 'admin' && (
-          <TouchableOpacity
-            style={[styles.deleteButton, { backgroundColor: colors.error + '20' }]}
-            onPress={() => {
-              setTaskToDelete(item.id);
-              setDeleteModalVisible(true);
-            }}
-          >
-            <Trash2 size={16} color={colors.error} />
-          </TouchableOpacity>
-        )}
-      </View>
+      {/* Botão de deletar permanece, se admin */}
+      {userRole === 'admin' && (
+        <TouchableOpacity
+          style={[styles.deleteButton, { backgroundColor: colors.error + '20', alignSelf: 'flex-end', marginTop: 8 }]}
+          onPress={() => {
+            setTaskToDelete(item.id);
+            setDeleteModalVisible(true);
+          }}
+        >
+          <Trash2 size={16} color={colors.error} />
+        </TouchableOpacity>
+      )}
     </View>
   );
 
@@ -680,61 +671,86 @@ export default function TasksScreen() {
         detailsMode={detailsMode}
       />
 
-      {/* Comments Modal */}
+      {/* Comments Modal - Instagram Style */}
       <Modal
         visible={commentModalVisible}
         transparent
         animationType="slide"
         onRequestClose={() => setCommentModalVisible(false)}
       >
-        <KeyboardAvoidingView 
-          style={styles.modalOverlay}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        >
-          <View style={[styles.commentsModal, { backgroundColor: colors.surface }]}>
-            <View style={styles.commentsModalHeader}>
-              <Text style={[styles.commentsModalTitle, { color: colors.text }]}>
-                Comentários
-              </Text>
+        <View style={styles.igOverlay}>
+          <View style={[styles.igBottomSheet, { backgroundColor: colors.surface }]}>  
+            {/* Carrossel de mídias */}
+            {(selectedTaskForComments?.photos?.length ?? 0) > 0 || (selectedTaskForComments?.videos?.length ?? 0) > 0 ? (
+              <FlatList
+                data={[
+                  ...(selectedTaskForComments?.photos || []).map(url => ({ type: 'photo', url })),
+                  ...(selectedTaskForComments?.videos || []).map(url => ({ type: 'video', url })),
+                ]}
+                horizontal
+                pagingEnabled
+                showsHorizontalScrollIndicator={false}
+                keyExtractor={(item, index) => `${item.type}-${index}`}
+                style={styles.igCarousel}
+                renderItem={({ item }) => (
+                  item.type === 'photo' ? (
+                    <Image source={{ uri: item.url }} style={styles.igMedia} />
+                  ) : (
+                    <Video
+                      source={{ uri: item.url }}
+                      style={styles.igMedia}
+                      useNativeControls
+                      resizeMode={ResizeMode.COVER}
+                      isLooping
+                    />
+                  )
+                )}
+              />
+            ) : (
+              <View style={[styles.igMedia, { justifyContent: 'center', alignItems: 'center' }]}> 
+                <Text style={{ color: '#888' }}>Sem mídia</Text>
+              </View>
+            )}
+            {/* Header */}
+            <View style={styles.igHeader}>
+              <Text style={[styles.igTitle, { color: colors.text }]}>Comentários</Text>
               <TouchableOpacity onPress={() => setCommentModalVisible(false)}>
                 <X size={24} color={colors.textMuted} />
               </TouchableOpacity>
             </View>
-            
-            <ScrollView style={styles.commentsList}>
-              {selectedTaskForComments?.comments?.map((comment) => {
+            {/* Lista de comentários */}
+            <FlatList
+              data={selectedTaskForComments?.comments || []}
+              keyExtractor={item => item.id}
+              style={styles.igCommentsList}
+              contentContainerStyle={{ padding: 16, paddingBottom: 8 }}
+              renderItem={({ item: comment }) => {
                 const isOwnComment = currentUser && comment.userId === currentUser.id;
                 return (
-                  <View key={comment.id} style={[
-                    styles.commentItemFull,
-                    isOwnComment ? styles.ownCommentFull : styles.otherCommentFull
+                  <View style={[
+                    styles.commentItem,
+                    isOwnComment ? styles.ownComment : styles.otherComment
                   ]}>
                     <View style={[
-                      styles.commentBubbleFull,
-                      isOwnComment ? styles.ownCommentBubbleFull : styles.otherCommentBubbleFull
+                      styles.commentBubble,
+                      isOwnComment ? styles.ownCommentBubble : styles.otherCommentBubble
                     ]}>
-                      <Text style={[styles.commentUserName, { color: '#6B7280' }]}>
-                        {formatUserName(comment.userName)}
-                      </Text>
-                      <Text style={[styles.commentTextFull, { color: '#1F2937' }]}>
+                      <Text style={[styles.commentText, { color: '#1F2937' }]} numberOfLines={2}>
                         {comment.text}
                       </Text>
-                      <Text style={[styles.commentTimeFull, { color: '#6B7280' }]}>
+                      <Text style={[styles.commentTime, { color: '#6B7280' }]}>
                         {formatCommentDateTime(comment.timestamp)}
                       </Text>
                     </View>
                   </View>
                 );
-              })}
-            </ScrollView>
-            
-            <View style={styles.commentInputContainer}>
+              }}
+              ListEmptyComponent={<Text style={{ color: colors.textMuted, textAlign: 'center', marginTop: 24 }}>Nenhum comentário ainda.</Text>}
+            />
+            {/* Campo para adicionar comentário */}
+            <View style={styles.igInputContainer}>
               <TextInput
-                style={[styles.commentInput, { 
-                  backgroundColor: colors.background,
-                  color: colors.text,
-                  borderColor: colors.border
-                }]}
+                style={[styles.igInput, { backgroundColor: colors.background, color: colors.text, borderColor: colors.border }]}
                 placeholder="Adicionar comentário..."
                 placeholderTextColor={colors.textMuted}
                 value={newComment}
@@ -748,14 +764,8 @@ export default function TasksScreen() {
               />
               <TouchableOpacity
                 style={[
-                  styles.sendButton,
-                  { backgroundColor: newComment.trim() ? colors.primary : colors.textMuted + '30',
-                    transform: [{ scale: newComment.trim() ? 1.1 : 1 }],
-                    shadowColor: newComment.trim() ? colors.primary : 'transparent',
-                    shadowOpacity: newComment.trim() ? 0.3 : 0,
-                    shadowRadius: 6,
-                    shadowOffset: { width: 0, height: 2 },
-                  }
+                  styles.igSendButton,
+                  { backgroundColor: newComment.trim() ? colors.primary : colors.textMuted + '30' }
                 ]}
                 onPress={handleAddComment}
                 disabled={!newComment.trim()}
@@ -765,7 +775,7 @@ export default function TasksScreen() {
               </TouchableOpacity>
             </View>
           </View>
-        </KeyboardAvoidingView>
+        </View>
       </Modal>
 
       {/* Delete Confirmation Modal */}
@@ -1192,71 +1202,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  commentsModal: {
-    width: '90%',
-    height: '80%',
-    borderRadius: 16,
-    overflow: 'hidden',
-  },
-  commentsModalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
-  },
-  commentsModalTitle: {
-    fontSize: 18,
-    fontFamily: 'Inter-SemiBold',
-  },
-  commentsList: {
-    flex: 1,
-    padding: 16,
-  },
-  commentItemFull: {
-    marginBottom: 16,
-  },
-  commentHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  commentTimeFull: {
-    fontSize: 11,
-    fontFamily: 'Inter-Regular',
-  },
-  commentTextFull: {
-    fontSize: 14,
-    fontFamily: 'Inter-Regular',
-    lineHeight: 20,
-  },
-  commentInputContainer: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    padding: 16,
-    gap: 8,
-    borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
-  },
-  commentInput: {
-    flex: 1,
-    borderWidth: 1,
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    maxHeight: 80,
-    fontSize: 14,
-    fontFamily: 'Inter-Regular',
-  },
-  sendButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
   deleteModal: {
     borderRadius: 16,
     padding: 24,
@@ -1538,5 +1483,82 @@ const styles = StyleSheet.create({
   photoThumbnailImage: {
     width: '100%',
     height: '100%',
+  },
+  igOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  igBottomSheet: {
+    width: '100%',
+    maxHeight: '75%',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    overflow: 'hidden',
+    paddingBottom: 8,
+  },
+  igCarousel: {
+    width: '100%',
+    backgroundColor: '#000',
+  },
+  igMedia: {
+    width: '100%',
+    aspectRatio: 1.7,
+    backgroundColor: '#000',
+  },
+  igHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 4,
+  },
+  igTitle: {
+    fontSize: 18,
+    fontFamily: 'Inter-SemiBold',
+  },
+  igCommentsList: {
+    flex: 1,
+    backgroundColor: 'transparent',
+  },
+  igInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#333',
+    backgroundColor: 'rgba(34,40,49,0.97)',
+    gap: 8,
+  },
+  igInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    maxHeight: 80,
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+  },
+  igSendButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  igCardMedia: {
+    width: '100%',
+    height: 300,
+    backgroundColor: '#000',
+  },
+  igCardActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    gap: 8,
   },
 });

@@ -52,7 +52,13 @@ export default function InviteWorkerScreen() {
 
     setLoading(true);
     try {
-      await AuthService.getInstance().sendInvite(email.trim());
+      const currentSite = await AuthService.getCurrentSite();
+      if (!currentSite || !currentSite.id) {
+        Alert.alert('Erro', 'Nenhum canteiro selecionado.');
+        setLoading(false);
+        return;
+      }
+      await AuthService.getInstance().createInvite(email.trim(), currentSite.id);
       setSuccessEmail(email.trim());
       setShowSuccessModal(true);
       setEmail('');

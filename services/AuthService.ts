@@ -52,6 +52,7 @@ export interface User {
   };
   inviteId?: string;
   isSuperAdmin?: boolean;
+  funcao?: string;
 }
 
 export interface Site {
@@ -476,6 +477,7 @@ export class AuthService {
     siteName?: string;
     inviteId?: string;
     isSuperAdmin?: boolean;
+    funcao?: string;
   }): Promise<boolean> {
     try {
       console.log('🔍 AuthService.register chamado com:', JSON.stringify(userData, null, 2));
@@ -499,7 +501,8 @@ export class AuthService {
         company: userData.company?.trim() || '',
         siteName: userData.siteName?.trim() || '',
         inviteId: userData.inviteId?.trim() || '',
-        isSuperAdmin: userData.isSuperAdmin === true
+        isSuperAdmin: userData.isSuperAdmin === true,
+        funcao: userData.funcao?.trim() || '',
       };
 
       let user: any = {};
@@ -602,6 +605,10 @@ export class AuthService {
 
       // Adicionar ID do usuário
       user.id = userCredential.user.uid;
+      // Adicionar função, se fornecida
+      if (cleanUserData.funcao) {
+        user.funcao = cleanUserData.funcao;
+      }
 
       // IMPORTANTE: Remover campos que não devem ir para o Firestore
       const userForFirestore = { ...user };
@@ -800,6 +807,7 @@ export class AuthService {
     siteName?: string;
     inviteId?: string;
     isSuperAdmin?: boolean;
+    funcao?: string;
   }): Promise<boolean> {
     return AuthService.register(userData);
   }
@@ -915,6 +923,7 @@ export class AuthService {
     siteName?: string;
     inviteId?: string;
     isSuperAdmin?: boolean;
+    funcao?: string;
   }): Promise<boolean> {
     console.log('AuthService.registerStatic called with:', userData);
     const instance = AuthService.getInstance();
@@ -931,6 +940,7 @@ export class AuthService {
     siteName?: string;
     inviteId?: string;
     isSuperAdmin?: boolean;
+    funcao?: string;
   }): Promise<boolean> {
     try {
       console.log('🚀 Iniciando registro completamente estático...');
@@ -954,7 +964,8 @@ export class AuthService {
         sites: [],
         status: 'active',
         inviteId: userData.inviteId,
-        isSuperAdmin: userData.isSuperAdmin === true
+        isSuperAdmin: userData.isSuperAdmin === true,
+        funcao: userData.funcao?.trim() || '',
       };
 
       console.log('💾 Dados do usuário a serem salvos:', JSON.stringify(user, null, 2));
@@ -1074,6 +1085,9 @@ export class AuthService {
       const user = JSON.parse(userData);
       console.log('Usuário parseado:', user);
       console.log('Role do usuário:', user.role);
+      console.log('Tipo do role:', typeof user.role);
+      console.log('Role é admin?', user.role === 'admin');
+      console.log('Role é worker?', user.role === 'worker');
       console.log('=== FIM DEBUG getUserRole ===');
       return user.role;
     } catch (error) {
@@ -1143,44 +1157,6 @@ export class AuthService {
       });
     } catch (error) {
       console.error('Erro ao remover colaborador:', error);
-      throw error;
-    }
-  }
-
-  async sendInvite(email: string): Promise<void> {
-    try {
-      const currentUser = await AuthService.getCurrentUser();
-      if (!currentUser) {
-        throw new Error('Usuário não autenticado');
-      }
-
-      // Buscar o site selecionado no AsyncStorage ou usar o primeiro da lista
-      let siteId: string | undefined;
-      let siteName: string | undefined;
-      const selectedSite = await AsyncStorage.getItem(AuthService.SITE_KEY);
-      if (selectedSite) {
-        const siteObj = JSON.parse(selectedSite);
-        siteId = siteObj.id;
-        siteName = siteObj.name;
-      } else if (currentUser.sites && currentUser.sites.length > 0) {
-        siteId = currentUser.sites[0];
-        // Buscar o nome da obra pelo id
-        const siteDoc = await getDoc(doc(db, 'sites', siteId));
-        siteName = siteDoc.exists() ? (siteDoc.data() as any).name : undefined;
-      }
-      if (!siteId || !siteName) {
-        throw new Error('Nenhum canteiro selecionado para o convite.');
-      }
-
-      await addDoc(collection(db, 'invites'), {
-        email,
-        status: 'pending',
-        siteId,
-        siteName,
-        createdAt: serverTimestamp(),
-      });
-    } catch (error) {
-      console.error('Erro ao enviar convite:', error);
       throw error;
     }
   }
@@ -2466,6 +2442,29 @@ export class AuthService {
     } catch (error) {
       console.error('[deleteInvite] Erro ao excluir convite:', error);
       throw error;
+    }
+  }
+
+  // Método de debug para verificar AsyncStorage
+  static async debugAsyncStorage(): Promise<void> {
+    try {
+      console.log('=== DEBUG ASYNC STORAGE ===');
+      const userData = await AsyncStorage.getItem(AuthService.USER_KEY);
+      console.log('Dados brutos do AsyncStorage:', userData);
+      
+      if (userData) {
+        const user = JSON.parse(userData);
+        console.log('Usuário parseado:', user);
+        console.log('Role:', user.role);
+        console.log('Tipo do role:', typeof user.role);
+        console.log('Email:', user.email);
+        console.log('Nome:', user.name);
+      } else {
+        console.log('Nenhum dado encontrado no AsyncStorage');
+      }
+      console.log('=== FIM DEBUG ASYNC STORAGE ===');
+    } catch (error) {
+      console.error('Erro ao debugar AsyncStorage:', error);
     }
   }
 }

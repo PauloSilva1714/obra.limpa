@@ -490,7 +490,7 @@ export const EmailService = {
           <!-- Header -->
           <div style="background: linear-gradient(135deg, #059669 0%, #10B981 100%); padding: 30px; text-align: center; border-radius: 8px 8px 0 0;">
             <h1 style="color: white; margin: 0; font-size: 28px; font-weight: bold;">👷 Convite Especial</h1>
-            <p style="color: #D1FAE5; margin: 10px 0 0 0; font-size: 16px;">Você foi convidado para ser Colaborador</p>
+            <p style="color: #D1FAE5; margin: 10px 0 0 0; font-size: 16px;">Você foi convidado para ser Colaborador(a)</p>
           </div>
 
           <!-- Main Content -->
@@ -518,7 +518,7 @@ export const EmailService = {
                 <tr>
                   <td style="padding: 8px 0; border-bottom: 1px solid #F3F4F6; color: #6B7280;"><strong>🎯 Função:</strong></td>
                   <td style="padding: 8px 0; border-bottom: 1px solid #F3F4F6; color: #1F2937;">
-                    <span style="background-color: #D1FAE5; color: #047857; padding: 4px 8px; border-radius: 4px; font-weight: bold;">Colaborador</span>
+                    <span style="background-color: #D1FAE5; color: #047857; padding: 4px 8px; border-radius: 4px; font-weight: bold;">Colaborador(a)</span>
                   </td>
                 </tr>
                 <tr>

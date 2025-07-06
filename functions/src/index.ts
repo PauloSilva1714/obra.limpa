@@ -196,15 +196,66 @@ export const onUserDelete = functions.auth.user().onDelete(async (user) => {
 export const onInviteCreate = functions.firestore
   .document('invites/{inviteId}')
   .onCreate(async (snap, context) => {
+    // Alteração simples: comentário para forçar redeploy em 2024-06-07
     const invite = snap.data();
     if (!invite || !invite.email) return;
 
     const subject = 'Convite para colaborar no Obra Limpa';
     const html = `
-      <p>Olá,</p>
-      <p>Você foi convidado para colaborar no canteiro <b>${invite.siteName || ''}</b>.</p>
-      <p>Para aceitar o convite, acesse o aplicativo e registre-se com este e-mail.</p>
-      <p>Atenciosamente,<br/>Equipe Obra Limpa</p>
+      <div style="background:#f4f6fb;padding:32px 0;font-family:sans-serif;">
+        <div style="max-width:480px;margin:0 auto;background:#fff;border-radius:12px;box-shadow:0 2px 8px #0001;padding:32px 24px;">
+          <div style="background:#fee2e2;border:2px solid #dc2626;border-radius:8px;padding:16px 0;margin-bottom:24px;text-align:center;">
+            <h2 style="color:#dc2626;font-size:1.5rem;margin:0;">ERRO DE TESTE FUNÇÃO FIREBASE</h2>
+            <p style="color:#b91c1c;font-size:1rem;margin:0;">Se você está vendo esta mensagem, o e-mail veio da função onInviteCreate!</p>
+          </div>
+          <div style="text-align:center;margin-bottom:24px;">
+            <img src='https://i.imgur.com/2yaf2wb.png' alt='Obra Limpa' style='width:64px;height:64px;border-radius:12px;margin-bottom:8px;' />
+            <h2 style="margin:0;color:#1a202c;font-size:1.5rem;">Convite para Colaborador</h2>
+          </div>
+          <p style="font-size:1.1rem;color:#222;margin-bottom:16px;">Olá,</p>
+          <p style="font-size:1.1rem;color:#222;margin-bottom:16px;">
+            Você foi convidado para colaborar no canteiro <b>${invite.siteName || ''}</b>.<br/>
+            <span style="color:#4a5568;font-size:0.98rem;">(Convite exclusivo para colaboradores)</span>
+          </p>
+          <div style="background:#f1f5f9;border-radius:8px;padding:16px 12px;margin-bottom:20px;">
+            <ul style="padding-left:18px;margin:0;color:#222;font-size:1rem;">
+              <li>Tenha acesso ao canteiro e suas tarefas</li>
+              <li>Receba notificações e comunicados</li>
+              <li>Participe da equipe Obra Limpa</li>
+            </ul>
+          </div>
+          
+          <!-- Código do Convite -->
+          <div style="background:#f0f9ff;border:2px solid #2563eb;border-radius:8px;padding:20px;margin-bottom:24px;text-align:center;">
+            <h3 style="margin:0 0 12px 0;color:#1e40af;font-size:1.1rem;">🔑 Código do Convite</h3>
+            <div style="background:#ffffff;border:1px solid #dbeafe;border-radius:6px;padding:12px;margin:0 auto;display:inline-block;">
+              <span style="font-family:monospace;font-size:1.2rem;font-weight:bold;color:#1e40af;letter-spacing:1px;">${context.params.inviteId}</span>
+            </div>
+            <p style="margin:12px 0 0 0;color:#6b7280;font-size:0.9rem;">Use este código ao se cadastrar no aplicativo</p>
+          </div>
+          
+          <div style="text-align:center;margin-bottom:24px;">
+            <a href="#" style="display:inline-block;padding:12px 32px;background:#2563eb;color:#fff;border-radius:8px;text-decoration:none;font-weight:600;font-size:1.1rem;">Aceitar Convite</a>
+          </div>
+          
+          <!-- Instruções -->
+          <div style="background:#f8fafc;border-radius:8px;padding:20px;margin-bottom:20px;">
+            <h4 style="margin:0 0 12px 0;color:#374151;font-size:1rem;">📝 Como aceitar o convite:</h4>
+            <ol style="color:#6b7280;line-height:1.6;margin:0;padding-left:20px;font-size:0.95rem;">
+              <li>Acesse o aplicativo Obra Limpa</li>
+              <li>Clique em "Cadastrar" ou "Registrar"</li>
+              <li>Preencha seus dados pessoais</li>
+              <li>Use o código de convite: <strong>${context.params.inviteId}</strong></li>
+              <li>Complete o cadastro e comece a colaborar!</li>
+            </ol>
+          </div>
+          
+          <p style="color:#4a5568;font-size:0.98rem;margin-bottom:8px;">Para aceitar o convite, acesse o aplicativo Obra Limpa e registre-se com este e-mail.</p>
+          <p style="color:#4a5568;font-size:0.98rem;margin-bottom:0;">Se você não reconhece este convite, pode ignorar este e-mail.</p>
+          <hr style="margin:24px 0;border:none;border-top:1px solid #e2e8f0;"/>
+          <div style="text-align:center;color:#a0aec0;font-size:0.95rem;">Equipe Obra Limpa</div>
+        </div>
+      </div>
     `;
 
     try {
@@ -220,4 +271,4 @@ export const onInviteCreate = functions.firestore
     }
   });
 
-// Forçar redeploy: alteração feita em 2024-06-29
+// Forçar redeploy: código do convite adicionado ao e-mail em 2024-12-19

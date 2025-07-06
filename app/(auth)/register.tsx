@@ -24,8 +24,18 @@ import {
   Inter_600SemiBold,
   Inter_700Bold,
 } from '@expo-google-fonts/inter';
+import { Picker } from '@react-native-picker/picker';
 
 const { width } = Dimensions.get('window');
+
+const FUNCOES_OBRA = [
+  'Pedreiro',
+  'Carpinteiro',
+  'Auxiliar de Obras',
+  'Eletricista',
+  'Armador',
+  'Outro',
+];
 
 export default function RegisterScreen() {
   const { role, inviteId } = useLocalSearchParams<{ role: 'admin' | 'worker', inviteId?: string }>();
@@ -39,6 +49,8 @@ export default function RegisterScreen() {
     siteName: '',
     siteAddress: '',
     inviteCode: inviteId || '',
+    funcao: '',
+    funcaoOutro: '',
   });
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -111,6 +123,10 @@ export default function RegisterScreen() {
         Alert.alert('Erro', 'Código de convite é obrigatório para colaboradores.');
         return;
       }
+      if (!formData.funcao.trim() || (formData.funcao === 'Outro' && !formData.funcaoOutro.trim())) {
+        Alert.alert('Erro', 'Por favor, informe sua função.');
+        return;
+      }
 
       try {
         const isValidInvite = await AuthService.validateInvite(formData.inviteCode.trim(), formData.email.trim());
@@ -134,7 +150,8 @@ export default function RegisterScreen() {
         phone: formData.phone.trim(),
         company: formData.company.trim(),
         siteName: formData.siteName.trim(),
-        inviteId: formData.inviteCode.trim()
+        inviteId: formData.inviteCode.trim(),
+        funcao: formData.funcao === 'Outro' ? formData.funcaoOutro.trim() : formData.funcao.trim(),
       });
 
       // Mostrar modal de sucesso
@@ -172,7 +189,9 @@ export default function RegisterScreen() {
       company: '',
       siteName: '',
       siteAddress: '',
-      inviteCode: ''
+      inviteCode: '',
+      funcao: '',
+      funcaoOutro: '',
     });
     router.replace('/(auth)/login');
   };
@@ -326,16 +345,43 @@ export default function RegisterScreen() {
 
             {/* Campo específico para colaborador */}
             {role === 'worker' && (
-              <View style={styles.inputContainer}>
-                <Key size={20} color="#6B7280" style={styles.inputIcon} />
-                <TextInput
-                  style={styles.input}
-                  placeholder="Código do convite"
-                  value={formData.inviteCode}
-                  onChangeText={(text) => setFormData({ ...formData, inviteCode: text })}
-                  placeholderTextColor="#9CA3AF"
-                />
-              </View>
+              <>
+                <View style={styles.inputContainer}>
+                  <Key size={20} color="#6B7280" style={styles.inputIcon} />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Código do convite"
+                    value={formData.inviteCode}
+                    onChangeText={(text) => setFormData({ ...formData, inviteCode: text })}
+                    placeholderTextColor="#9CA3AF"
+                  />
+                </View>
+                <View style={styles.inputContainer}>
+                  <User size={20} color="#6B7280" style={styles.inputIcon} />
+                  <Picker
+                    selectedValue={formData.funcao}
+                    style={[styles.input, { color: formData.funcao ? '#1F2937' : '#9CA3AF', paddingLeft: 0, paddingVertical: 0 }]}
+                    onValueChange={(itemValue) => setFormData({ ...formData, funcao: itemValue })}
+                  >
+                    <Picker.Item label="Selecione sua função" value="" color="#9CA3AF" />
+                    {FUNCOES_OBRA.map((f) => (
+                      <Picker.Item key={f} label={f} value={f} />
+                    ))}
+                  </Picker>
+                </View>
+                {formData.funcao === 'Outro' && (
+                  <View style={styles.inputContainer}>
+                    <User size={20} color="#6B7280" style={styles.inputIcon} />
+                    <TextInput
+                      style={styles.input}
+                      placeholder="Digite sua função"
+                      value={formData.funcaoOutro}
+                      onChangeText={(text) => setFormData({ ...formData, funcaoOutro: text })}
+                      placeholderTextColor="#9CA3AF"
+                    />
+                  </View>
+                )}
+              </>
             )}
 
             {/* Campo Senha */}

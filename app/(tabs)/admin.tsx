@@ -7,6 +7,8 @@ import {
   ScrollView,
   Alert,
   SafeAreaView,
+  Modal,
+  FlatList,
 } from 'react-native';
 import { router } from 'expo-router';
 import {
@@ -47,6 +49,12 @@ export default function AdminScreen() {
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [workersModalVisible, setWorkersModalVisible] = useState(false);
+  const [workers, setWorkers] = useState<User[]>([]);
+  const [loadingWorkers, setLoadingWorkers] = useState(false);
+  const [sitesModalVisible, setSitesModalVisible] = useState(false);
+  const [sites, setSites] = useState([]);
+  const [loadingSites, setLoadingSites] = useState(false);
 
   useEffect(() => {
     const checkUserAndLoadData = async () => {
@@ -77,6 +85,34 @@ export default function AdminScreen() {
       console.error('Erro ao carregar estatísticas:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const openWorkersModal = async () => {
+    setLoadingWorkers(true);
+    setWorkersModalVisible(true);
+    try {
+      const allWorkers = await AuthService.getInstance().getWorkers();
+      setWorkers(allWorkers.filter(w => w.status === 'active'));
+    } catch (e) {
+      setWorkers([]);
+      Alert.alert('Erro', 'Não foi possível carregar os colaboradores.');
+    } finally {
+      setLoadingWorkers(false);
+    }
+  };
+
+  const openSitesModal = async () => {
+    setLoadingSites(true);
+    setSitesModalVisible(true);
+    try {
+      const userSites = await AuthService.getUserSites();
+      setSites(userSites);
+    } catch (e) {
+      setSites([]);
+      Alert.alert('Erro', 'Não foi possível carregar as obras.');
+    } finally {
+      setLoadingSites(false);
     }
   };
 
@@ -138,23 +174,31 @@ export default function AdminScreen() {
     title, 
     value, 
     icon, 
-    color = colors.primary 
+    color = colors.primary, 
+    onPress 
   }: {
     title: string;
     value: number;
     icon: React.ReactNode;
     color?: string;
-  }) => (
-    <View style={[styles.statCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-      <View style={[styles.statIcon, { backgroundColor: color + '15' }]}>
-        {icon}
+    onPress?: () => void;
+  }) => {
+    const content = (
+      <View style={[styles.statCard, { backgroundColor: colors.surface, borderColor: colors.border }]}> 
+        <View style={[styles.statIcon, { backgroundColor: color + '15' }]}> 
+          {icon}
+        </View>
+        <View style={styles.statContent}>
+          <Text style={[styles.statValue, { color }]}>{value}</Text>
+          <Text style={[styles.statTitle, { color: colors.textSecondary }]}>{title}</Text>
+        </View>
       </View>
-      <View style={styles.statContent}>
-        <Text style={[styles.statValue, { color }]}>{value}</Text>
-        <Text style={[styles.statTitle, { color: colors.textSecondary }]}>{title}</Text>
-      </View>
-    </View>
-  );
+    );
+    if (onPress) {
+      return <View style={{ width: '48%' }}><TouchableOpacity onPress={onPress} activeOpacity={0.8}>{content}</TouchableOpacity></View>;
+    }
+    return <View style={{ width: '48%' }}>{content}</View>;
+  };
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
@@ -184,24 +228,28 @@ export default function AdminScreen() {
               value={stats.totalSites}
               icon={<Building2 size={20} color={colors.primary} />}
               color={colors.primary}
+              onPress={openSitesModal}
             />
             <StatCard
               title="Colaboradores"
               value={stats.totalWorkers}
               icon={<Users size={20} color={colors.success} />}
               color={colors.success}
+              onPress={openWorkersModal}
             />
             <StatCard
               title="Tarefas"
               value={stats.totalTasks}
               icon={<FileText size={20} color={colors.accent} />}
               color={colors.accent}
+              onPress={() => Alert.alert('Tarefas', 'Você clicou no card de Tarefas!')}
             />
             <StatCard
               title="Concluídas"
               value={stats.completedTasks}
               icon={<BarChart3 size={20} color={colors.warning} />}
               color={colors.warning}
+              onPress={() => Alert.alert('Concluídas', 'Você clicou no card de Concluídas!')}
             />
           </View>
         </View>
@@ -263,6 +311,83 @@ export default function AdminScreen() {
           />
         </View>
       </ScrollView>
+
+      {/* Modal de Colaboradores */}
+      <Modal
+        visible={workersModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setWorkersModalVisible(false)}
+      >
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' }}>
+          <View style={{ width: '90%', maxHeight: '80%', backgroundColor: colors.surface, borderRadius: 16, padding: 20 }}>
+            <Text style={{ fontSize: 20, fontWeight: 'bold', color: colors.text, marginBottom: 16 }}>Colaboradores Ativos</Text>
+            {loadingWorkers ? (
+              <Text style={{ color: colors.text }}>Carregando...</Text>
+            ) : workers.length === 0 ? (
+              <Text style={{ color: colors.textSecondary }}>Nenhum colaborador ativo encontrado.</Text>
+            ) : (
+              <FlatList
+                data={workers}
+                keyExtractor={item => item.id}
+                renderItem={({ item }) => (
+                  <View style={{ paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+                    <Text style={{ fontSize: 16, color: colors.text }}>{item.name}</Text>
+                    <Text style={{ fontSize: 14, color: colors.textSecondary }}>Função: {item.funcao || 'Não informada'}</Text>
+                  </View>
+                )}
+                style={{ maxHeight: 350 }}
+              />
+            )}
+            <TouchableOpacity onPress={() => setWorkersModalVisible(false)} style={{ marginTop: 20, alignSelf: 'center' }}>
+              <Text style={{ color: colors.primary, fontSize: 16 }}>Fechar</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal de Obras */}
+      <Modal
+        visible={sitesModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setSitesModalVisible(false)}
+      >
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' }}>
+          <View style={{ width: '90%', maxHeight: '80%', backgroundColor: colors.surface, borderRadius: 16, padding: 20 }}>
+            <Text style={{ fontSize: 20, fontWeight: 'bold', color: colors.text, marginBottom: 16 }}>Obras</Text>
+            {loadingSites ? (
+              <Text style={{ color: colors.text }}>Carregando...</Text>
+            ) : sites.length === 0 ? (
+              <Text style={{ color: colors.textSecondary }}>Nenhuma obra encontrada.</Text>
+            ) : (
+              <FlatList
+                data={sites}
+                keyExtractor={item => item.id}
+                renderItem={({ item }) => (
+                  <View style={{
+                    backgroundColor: '#F3F4F6',
+                    borderRadius: 12,
+                    padding: 16,
+                    marginBottom: 12,
+                    shadowColor: '#000',
+                    shadowOpacity: 0.06,
+                    shadowRadius: 4,
+                    elevation: 2,
+                  }}>
+                    <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#222' }}>{item.name}</Text>
+                    <Text style={{ fontSize: 14, color: '#444', marginTop: 2 }}>{item.address || 'Endereço não informado'}</Text>
+                  </View>
+                )}
+                style={{ maxHeight: 350 }}
+              />
+            )}
+            <TouchableOpacity onPress={() => setSitesModalVisible(false)} style={{ marginTop: 20, alignSelf: 'center' }}>
+              <Text style={{ color: colors.primary, fontSize: 16 }}>Fechar</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
