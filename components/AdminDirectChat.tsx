@@ -90,15 +90,12 @@ export default function AdminDirectChat({
     if (!newMessage.trim()) return;
     try {
       setSending(true);
-      console.log('Enviando mensagem individual:', newMessage);
       await AdminService.sendDirectMessage(siteId, otherUserId, newMessage.trim());
       setNewMessage('');
       setTimeout(() => {
         flatListRef.current?.scrollToEnd({ animated: true });
       }, 100);
-      console.log('Mensagem enviada com sucesso!');
     } catch (error: any) {
-      console.error('Erro ao enviar mensagem:', error);
       Alert.alert('Erro', 'Não foi possível enviar a mensagem: ' + (error?.message || ''));
     } finally {
       setSending(false);

@@ -62,15 +62,11 @@ export default function AdminChatSessions({
 
   const loadSessions = async () => {
     try {
-      console.log('Carregando sessões de chat...');
       setLoading(true);
       
       const sessionsData = await AdminService.getChatSessions(siteId);
       setSessions(sessionsData);
-      
-      console.log('Sessões carregadas:', sessionsData.length);
     } catch (error) {
-      console.error('Erro ao carregar sessões:', error);
       Alert.alert('Erro', 'Não foi possível carregar as sessões de chat');
     } finally {
       setLoading(false);

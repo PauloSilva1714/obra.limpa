@@ -79,3 +79,29 @@ export async function uploadImageAsync(
     return typeof uriOrFile === 'string' ? uriOrFile : '';
   }
 }
+
+export async function uploadProfilePhoto(userId: string, uriOrFile: string | File): Promise<string> {
+  try {
+    const storage = getStorage();
+    let blob: Blob;
+    let fileName: string;
+
+    if (typeof uriOrFile === 'string') {
+      const response = await fetch(uriOrFile);
+      if (!response.ok) throw new Error(`Erro ao buscar imagem: ${response.status}`);
+      blob = await response.blob();
+      fileName = `profile/${userId}/profile_${Date.now()}.jpg`;
+    } else {
+      blob = uriOrFile;
+      fileName = `profile/${userId}/profile_${Date.now()}_${uriOrFile.name}`;
+    }
+
+    const fileRef = ref(storage, fileName);
+    await uploadBytes(fileRef, blob);
+    const downloadURL = await getDownloadURL(fileRef);
+    return downloadURL;
+  } catch (error) {
+    console.error('❌ Erro no upload de foto de perfil:', error);
+    return typeof uriOrFile === 'string' ? uriOrFile : '';
+  }
+}

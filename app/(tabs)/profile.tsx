@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, Switch, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, Switch, ScrollView, Modal, Image, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { User, Building2, LogOut, Settings, Bell, Shield, CircleHelp as HelpCircle } from 'lucide-react-native';
 import { AuthService, User as UserData } from '@/services/AuthService';
+import * as ImagePicker from 'expo-image-picker';
+import { uploadProfilePhoto } from '@/services/PhotoService';
 
 interface UserProfile {
   name: string;
@@ -16,11 +18,14 @@ interface UserProfile {
     taskUpdate: boolean;
     loginConfirmation: boolean;
   };
+  photoURL?: string;
 }
 
 export default function ProfileScreen() {
   const [userData, setUserData] = useState<UserData | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -61,10 +66,11 @@ export default function ProfileScreen() {
     setIsSaving(true);
     try {
       await AuthService.updateNotificationSettings(userData.id, userData.notifications || {});
-      Alert.alert('Sucesso', 'Configurações salvas com sucesso!');
+      const updatedUser = await AuthService.getUserById(userData.id);
+      setUserData(updatedUser);
+      setShowSuccessModal(true);
     } catch (error) {
       Alert.alert('Erro', 'Não foi possível salvar as configurações.');
-      console.error('Failed to save notification settings:', error);
     } finally {
       setIsSaving(false);
     }
@@ -77,6 +83,50 @@ export default function ProfileScreen() {
 
   const handleSwitchSite = () => {
     router.replace('/(auth)/site-selection');
+  };
+
+  const handlePickImage = async () => {
+    const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permissionResult.granted) {
+      Alert.alert('Permissão necessária', 'Permita o acesso à galeria para escolher uma foto.');
+      return;
+    }
+    const pickerResult = await ImagePicker.launchImageLibraryAsync({ 
+      mediaTypes: 'images', 
+      allowsEditing: true, 
+      aspect: [1, 1], 
+      quality: 0.7 
+    });
+    if (!pickerResult.canceled && pickerResult.assets && pickerResult.assets.length > 0) {
+      await handleUploadImage(pickerResult.assets[0].uri);
+    }
+  };
+
+  const handleTakePhoto = async () => {
+    const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
+    if (!permissionResult.granted) {
+      Alert.alert('Permissão necessária', 'Permita o acesso à câmera para tirar uma foto.');
+      return;
+    }
+    const pickerResult = await ImagePicker.launchCameraAsync({ allowsEditing: true, aspect: [1, 1], quality: 0.7 });
+    if (!pickerResult.canceled && pickerResult.assets && pickerResult.assets.length > 0) {
+      await handleUploadImage(pickerResult.assets[0].uri);
+    }
+  };
+
+  const handleUploadImage = async (uri: string) => {
+    if (!userData) return;
+    setUploading(true);
+    try {
+      const photoURL = await uploadProfilePhoto(userData.id, uri);
+      await AuthService.updateUserProfilePhoto(userData.id, photoURL);
+      setUserData({ ...userData, photoURL });
+      Alert.alert('Sucesso', 'Foto de perfil atualizada!');
+    } catch (error) {
+      Alert.alert('Erro', 'Não foi possível atualizar a foto de perfil.');
+    } finally {
+      setUploading(false);
+    }
   };
 
   const MenuSection = ({ title, children }: { title: string; children: React.ReactNode }) => (
@@ -143,6 +193,26 @@ export default function ProfileScreen() {
           <User size={40} color="#111827" />
           <View>
             <Text style={styles.userName}>{getGreeting()} {getFirstName(userData.name)}</Text>
+          </View>
+        </View>
+
+        <View style={{ alignItems: 'center', marginBottom: 24 }}>
+          {uploading ? (
+            <ActivityIndicator size="large" color="#22C55E" />
+          ) : userData?.photoURL ? (
+            <Image source={{ uri: userData.photoURL }} style={{ width: 96, height: 96, borderRadius: 48, marginBottom: 8 }} />
+          ) : (
+            <TouchableOpacity onPress={handlePickImage} style={{ width: 96, height: 96, borderRadius: 48, backgroundColor: '#E5E7EB', alignItems: 'center', justifyContent: 'center', marginBottom: 8 }}>
+              <User size={48} color="#6B7280" />
+            </TouchableOpacity>
+          )}
+          <View style={{ flexDirection: 'row', justifyContent: 'center' }}>
+            <TouchableOpacity onPress={handlePickImage} style={{ marginRight: 16 }}>
+              <Text style={{ color: '#2563EB', fontSize: 14 }}>Escolher da Galeria</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={handleTakePhoto}>
+              <Text style={{ color: '#2563EB', fontSize: 14 }}>Tirar Foto</Text>
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -243,6 +313,29 @@ export default function ProfileScreen() {
           </MenuSection>
         </View>
       </ScrollView>
+
+      {/* Modal de sucesso ao salvar alterações */}
+      <Modal
+        visible={showSuccessModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowSuccessModal(false)}
+      >
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' }}>
+          <View style={{ width: '80%', backgroundColor: '#fff', borderRadius: 16, padding: 24, alignItems: 'center' }}>
+            <Text style={{ fontSize: 20, fontWeight: 'bold', color: '#22C55E', marginBottom: 12 }}>Sucesso!</Text>
+            <Text style={{ fontSize: 16, color: '#374151', textAlign: 'center', marginBottom: 24 }}>
+              Configurações salvas com sucesso.
+            </Text>
+            <TouchableOpacity
+              style={{ backgroundColor: '#22C55E', borderRadius: 8, padding: 12, alignItems: 'center', width: '60%' }}
+              onPress={() => setShowSuccessModal(false)}
+            >
+              <Text style={{ color: '#fff', fontSize: 16 }}>OK</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }

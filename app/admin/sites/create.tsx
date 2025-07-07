@@ -38,7 +38,6 @@ export default function CreateSiteScreen() {
       Alert.alert('Sucesso', 'Obra criada com sucesso');
       router.back();
     } catch (error) {
-      console.error('Erro ao criar obra:', error);
       Alert.alert('Erro', 'Não foi possível criar a obra');
     } finally {
       setLoading(false);

@@ -58,7 +58,6 @@ export default function AdminSearch({
       setAdmins(adminsData);
       setFilteredAdmins(adminsData);
     } catch (error) {
-      console.error('Erro ao carregar administradores:', error);
       Alert.alert('Erro', 'Não foi possível carregar a lista de administradores');
     } finally {
       setLoading(false);

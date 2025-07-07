@@ -68,7 +68,6 @@ export default function AdminChatScreen() {
       setOtherAdmins(admins);
 
     } catch (error) {
-      console.error('Erro ao carregar dados:', error);
       Alert.alert('Erro', 'Não foi possível carregar os dados.');
     } finally {
       setLoading(false);
@@ -90,7 +89,6 @@ export default function AdminChatScreen() {
       Alert.alert('Nenhum administrador', 'Não há outros administradores disponíveis para conversar.');
       return;
     }
-
     setShowAdminSearch(true);
   };
 

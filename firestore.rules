@@ -56,6 +56,30 @@ service cloud.firestore {
       allow update, delete: if isAdmin();
       allow list: if isAuthenticated();
     }
+
+    // Regras para mensagens administrativas
+    match /adminMessages/{messageId} {
+      allow read, list: if isAuthenticated() && isAdmin();
+      allow create: if isAuthenticated() && isAdmin();
+      allow update, delete: if isAuthenticated() && isAdmin();
+    }
+
+    // Regras para mensagens diretas
+    match /adminDirectMessages/{messageId} {
+      allow read, list: if isAuthenticated() && (
+        isAdmin() || 
+        request.auth.uid == resource.data.senderId || 
+        request.auth.uid == resource.data.recipientId
+      );
+      allow create: if isAuthenticated() && isAdmin();
+      allow update, delete: if isAuthenticated() && isAdmin();
+    }
+
+    // Regras para sessões de chat
+    match /adminChatSessions/{sessionId} {
+      allow read, list: if isAuthenticated() && isAdmin();
+      allow create, update, delete: if isAuthenticated() && isAdmin();
+    }
   }
 }
 

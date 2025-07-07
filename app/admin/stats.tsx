@@ -40,7 +40,6 @@ export default function StatsScreen() {
 
   useEffect(() => {
     AuthService.getCurrentSite().then(site => {
-      console.log('Admin Stats - Site selecionado:', site?.id);
       setSiteId(site?.id ?? null);
     });
   }, []);
@@ -49,7 +48,6 @@ export default function StatsScreen() {
     if (!siteId) return;
     setLoading(true);
     const unsubscribeTasks = TaskService.subscribeToTasksBySite(siteId, (tasks) => {
-      console.log('Admin Stats - Atualização de tarefas recebida:', tasks);
       const completedTasks = tasks.filter((task: Task) => task.status === 'completed');
       const pendingTasks = tasks.filter((task: Task) => task.status === 'pending');
       const inProgressTasks = tasks.filter((task: Task) => task.status === 'in_progress');

@@ -7,6 +7,7 @@ import {
   FlatList,
   Alert,
   SafeAreaView,
+  Modal,
 } from 'react-native';
 import { router } from 'expo-router';
 import { Plus, Edit, Trash2, ArrowLeft } from 'lucide-react-native';
@@ -25,46 +26,43 @@ interface Site {
 export default function SitesScreen() {
   const [sites, setSites] = useState<Site[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [siteToDelete, setSiteToDelete] = useState<string | null>(null);
 
-  useEffect(() => {
-    let unsubscribes: (() => void)[] = [];
-    let isMounted = true;
-    const loadSites = async () => {
-      try {
-        setLoading(true);
-        const sitesData = await AuthService.getUserSites();
-        if (!isMounted) return;
-        unsubscribes = sitesData.map(site => {
-          console.log('Admin Sites - Site encontrado:', site.id);
-          return TaskService.subscribeToTasksBySite(site.id, (tasks) => {
-            console.log('Admin Sites - Atualização de tarefas recebida para site', site.id, tasks);
-            if (!isMounted) return;
-            const completedTasks = tasks.filter((task) => task.status === 'completed');
-            setSites(prevSites => {
-              const others = prevSites.filter(s => s.id !== site.id);
-              return [
-                ...others,
-                {
-                  ...site,
-                  tasksCount: tasks.length,
-                  completedTasks: completedTasks.length,
-                }
-              ];
-            });
+  const loadSites = async () => {
+    try {
+      setLoading(true);
+      const sitesData = await AuthService.getUserSites();
+      setSites(sitesData.map(site => ({ ...site, tasksCount: 0, completedTasks: 0 })));
+      // Atualiza tarefas para cada site
+      sitesData.forEach(site => {
+        TaskService.subscribeToTasksBySite(site.id, (tasks) => {
+          const completedTasks = tasks.filter((task) => task.status === 'completed');
+          setSites(prevSites => {
+            const others = prevSites.filter(s => s.id !== site.id);
+            return [
+              ...others,
+              {
+                ...site,
+                tasksCount: tasks.length,
+                completedTasks: completedTasks.length,
+              }
+            ];
           });
         });
-      } catch (error) {
-        console.error('Erro ao carregar obras:', error);
-        Alert.alert('Erro', 'Não foi possível carregar as obras');
-      } finally {
-        setLoading(false);
-      }
-    };
+      });
+    } catch (error) {
+      Alert.alert('Erro', 'Não foi possível carregar as obras');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    let isMounted = true;
     loadSites();
-    return () => {
-      isMounted = false;
-      unsubscribes.forEach(unsub => unsub && unsub());
-    };
+    return () => { isMounted = false; };
   }, []);
 
   const handleCreateSite = () => {
@@ -75,31 +73,20 @@ export default function SitesScreen() {
     router.push(`/admin/sites/edit?id=${siteId}`);
   };
 
-  const handleDeleteSite = async (siteId: string) => {
-    Alert.alert(
-      'Confirmar exclusão',
-      'Tem certeza que deseja excluir esta obra?',
-      [
-        {
-          text: 'Cancelar',
-          style: 'cancel',
-        },
-        {
-          text: 'Excluir',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await AuthService.deleteSite(siteId);
-              await loadSites();
-              Alert.alert('Sucesso', 'Obra excluída com sucesso');
-            } catch (error) {
-              console.error('Erro ao excluir obra:', error);
-              Alert.alert('Erro', 'Não foi possível excluir a obra');
-            }
-          },
-        },
-      ]
-    );
+  const handleDeleteSite = async () => {
+    if (!siteToDelete) return;
+    setDeleteLoading(true);
+    try {
+      await AuthService.deleteSite(siteToDelete);
+      setShowDeleteModal(false);
+      setSiteToDelete(null);
+      await loadSites();
+      Alert.alert('Sucesso', 'Obra excluída com sucesso');
+    } catch (error) {
+      Alert.alert('Erro', 'Não foi possível excluir a obra');
+    } finally {
+      setDeleteLoading(false);
+    }
   };
 
   const renderSiteItem = ({ item }: { item: Site }) => (
@@ -115,7 +102,10 @@ export default function SitesScreen() {
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.actionButton}
-            onPress={() => handleDeleteSite(item.id)}
+            onPress={() => {
+              setSiteToDelete(item.id);
+              setShowDeleteModal(true);
+            }}
           >
             <Trash2 size={20} color="#666" />
           </TouchableOpacity>
@@ -180,6 +170,39 @@ export default function SitesScreen() {
           contentContainerStyle={styles.list}
         />
       )}
+
+      {/* Modal de confirmação de exclusão */}
+      <Modal
+        visible={showDeleteModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowDeleteModal(false)}
+      >
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' }}>
+          <View style={{ width: '85%', backgroundColor: '#fff', borderRadius: 16, padding: 24, alignItems: 'center' }}>
+            <Text style={{ fontSize: 20, fontWeight: 'bold', color: '#EF4444', marginBottom: 12 }}>Remover Obra</Text>
+            <Text style={{ fontSize: 16, color: '#374151', textAlign: 'center', marginBottom: 24 }}>
+              Tem certeza que deseja remover esta obra? Esta ação não pode ser desfeita.
+            </Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', width: '100%' }}>
+              <TouchableOpacity
+                style={{ flex: 1, marginRight: 8, backgroundColor: '#E5E7EB', borderRadius: 8, padding: 12, alignItems: 'center' }}
+                onPress={() => setShowDeleteModal(false)}
+                disabled={deleteLoading}
+              >
+                <Text style={{ color: '#374151', fontSize: 16 }}>Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={{ flex: 1, marginLeft: 8, backgroundColor: '#EF4444', borderRadius: 8, padding: 12, alignItems: 'center' }}
+                onPress={handleDeleteSite}
+                disabled={deleteLoading}
+              >
+                <Text style={{ color: '#fff', fontSize: 16 }}>{deleteLoading ? 'Removendo...' : 'Remover'}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }

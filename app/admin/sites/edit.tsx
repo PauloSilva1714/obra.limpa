@@ -68,7 +68,6 @@ export default function EditSiteScreen() {
       });
       setShowSuccessModal(true);
     } catch (error) {
-      console.error('Erro ao atualizar obra:', error);
       Alert.alert('Erro', 'Erro ao atualizar obra. Tente novamente.');
     } finally {
       setSaving(false);
@@ -83,7 +82,6 @@ export default function EditSiteScreen() {
       Alert.alert('Sucesso', 'Obra removida com sucesso!');
       router.back();
     } catch (error) {
-      console.error('Erro ao remover obra:', error);
       Alert.alert('Erro', 'Erro ao remover obra. Verifique suas permissões ou tente novamente.');
     } finally {
       setDeleteLoading(false);

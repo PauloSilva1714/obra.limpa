@@ -215,7 +215,7 @@ export function TaskModal({ visible, task, userRole, onSave, onClose, detailsMod
       }
       
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: 'images',
         allowsEditing: true,
         aspect: [4, 3],
         quality: 0.8,
@@ -271,7 +271,7 @@ export function TaskModal({ visible, task, userRole, onSave, onClose, detailsMod
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Videos,
+        mediaTypes: 'videos',
         allowsEditing: true,
         quality: 0.8,
       });
@@ -429,8 +429,7 @@ export function TaskModal({ visible, task, userRole, onSave, onClose, detailsMod
       };
 
       // Adicionar comentário à tarefa usando TaskService
-      const taskServiceInstance = TaskService.getInstance();
-      await taskServiceInstance.addComment(task.id, comment);
+      await TaskService.addComment(task.id, comment);
       
       // Limpar campo de comentário
       setCommentText('');

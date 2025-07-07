@@ -66,7 +66,6 @@ export default function AddressSearch({
       setRecentAddresses(recent);
       setFavoriteAddresses(favorites);
     } catch (error) {
-      console.error('Erro ao carregar endereços salvos:', error);
       // Usar dados simulados em caso de erro
       const mockRecent = await AddressService.getMockRecentAddresses();
       setRecentAddresses(mockRecent);
@@ -116,12 +115,9 @@ export default function AddressSearch({
     searchTimeoutRef.current = setTimeout(async () => {
     setIsSearching(true);
     try {
-        console.log('Iniciando busca para:', text);
-      const results = await AddressService.searchAddresses(text);
-        console.log('Resultados da busca:', results);
+        const results = await AddressService.searchAddresses(text);
       setSearchResults(results);
     } catch (error) {
-      console.error('Erro na busca:', error);
       setSearchResults([]);
         // Mostrar erro apenas se não for um erro de rede esperado
         if (error instanceof Error && !error.message.includes('Failed to fetch')) {
@@ -157,7 +153,6 @@ export default function AddressSearch({
       // Recarregar dados salvos
       await loadSavedAddresses();
     } catch (error) {
-      console.error('Erro ao selecionar endereço:', error);
       Alert.alert('Erro', 'Não foi possível selecionar este endereço');
     }
   };
@@ -173,7 +168,6 @@ export default function AddressSearch({
         Alert.alert('Erro', 'Não foi possível obter sua localização atual');
       }
     } catch (error) {
-      console.error('Erro ao obter localização:', error);
       Alert.alert('Erro', 'Permissão de localização negada ou erro ao obter localização');
     } finally {
       setIsLoadingLocation(false);
@@ -196,7 +190,6 @@ export default function AddressSearch({
       const favorites = await AddressService.getFavoriteAddresses();
       setFavoriteAddresses(favorites);
     } catch (error) {
-      console.error('Erro ao alternar favorito:', error);
       Alert.alert('Erro', 'Não foi possível alterar o favorito');
     }
   };

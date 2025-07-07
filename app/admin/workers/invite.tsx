@@ -64,7 +64,6 @@ export default function InviteWorkerScreen() {
       setEmail('');
       await loadInvites();
     } catch (error) {
-      console.error('Erro ao enviar convite:', error);
       if (error instanceof Error) {
         Alert.alert('Erro', error.message);
       } else {
@@ -96,10 +95,8 @@ export default function InviteWorkerScreen() {
   };
 
   const handleCancelInvite = (inviteId) => {
-    console.log('[handleCancelInvite] Clicou para cancelar convite:', inviteId);
     setInviteToCancel(inviteId);
     setShowCancelModal(true);
-    console.log('[handleCancelInvite] showCancelModal deve ser true agora');
   };
 
   const executeCancelInvite = async () => {
@@ -279,7 +276,6 @@ export default function InviteWorkerScreen() {
       </Modal>
 
       {/* Modal de Cancelamento */}
-      {console.log('[JSX] Renderizando Modal de Cancelamento:', showCancelModal, inviteToCancel)}
       <Modal
         visible={showCancelModal}
         animationType="fade"

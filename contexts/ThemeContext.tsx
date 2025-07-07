@@ -139,7 +139,7 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
         setIsDarkMode(JSON.parse(savedTheme));
       }
     } catch (error) {
-      console.log('Erro ao carregar preferência de tema:', error);
+      // Erro ao carregar preferência de tema: error
     }
   };
 
@@ -147,7 +147,7 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
     try {
       await AsyncStorage.setItem('darkMode', JSON.stringify(value));
     } catch (error) {
-      console.log('Erro ao salvar preferência de tema:', error);
+      // Erro ao salvar preferência de tema: error
     }
   };
 

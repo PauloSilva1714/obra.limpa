@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   View, 
   Text, 
@@ -10,7 +10,8 @@ import {
   Platform, 
   Animated,
   Dimensions,
-  Modal
+  Modal,
+  Image
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -25,6 +26,7 @@ import {
   Inter_700Bold,
 } from '@expo-google-fonts/inter';
 import { Picker } from '@react-native-picker/picker';
+import logo from './obra-limpa-logo.png';
 
 const { width } = Dimensions.get('window');
 
@@ -65,6 +67,18 @@ export default function RegisterScreen() {
     'Inter-SemiBold': Inter_600SemiBold,
     'Inter-Bold': Inter_700Bold,
   });
+
+  // Adicione refs para os campos
+  const emailRef = useRef(null);
+  const phoneRef = useRef(null);
+  const companyRef = useRef(null);
+  const inviteCodeRef = useRef(null);
+  const siteNameRef = useRef(null);
+  const siteAddressRef = useRef(null);
+  const funcaoRef = useRef(null);
+  const funcaoOutroRef = useRef(null);
+  const passwordRef = useRef(null);
+  const confirmPasswordRef = useRef(null);
 
   useEffect(() => {
     document.title = 'Obra Limpa - Cadastro';
@@ -157,7 +171,6 @@ export default function RegisterScreen() {
       // Mostrar modal de sucesso
       setShowSuccessModal(true);
     } catch (error) {
-      console.error('Register error:', error);
       if (error instanceof Error) {
         if (error.message === 'Email já está em uso') {
           Alert.alert('Erro', 'Este e-mail já está cadastrado.');
@@ -226,7 +239,11 @@ export default function RegisterScreen() {
             <ArrowLeft size={24} color="#FFFFFF" />
           </TouchableOpacity>
           <View style={styles.logoContainer}>
-            <Building2 size={64} color="#FFFFFF" strokeWidth={3} />
+            <Image
+              source={logo}
+              style={{ width: 100, height: 100, marginBottom: 8 }}
+              resizeMode="contain"
+            />
           </View>
           <Text style={styles.title}>Obra Limpa</Text>
           <Text style={styles.subtitle}>Sistema de Gestão Inteligente</Text>
@@ -257,6 +274,9 @@ export default function RegisterScreen() {
                 value={formData.name}
                 onChangeText={(text) => setFormData({ ...formData, name: text })}
                 placeholderTextColor="#9CA3AF"
+                returnKeyType="next"
+                onSubmitEditing={() => emailRef.current && emailRef.current.focus()}
+                blurOnSubmit={false}
               />
             </View>
 
@@ -264,6 +284,7 @@ export default function RegisterScreen() {
             <View style={styles.inputContainer}>
               <Mail size={20} color="#6B7280" style={styles.inputIcon} />
               <TextInput
+                ref={emailRef}
                 style={styles.input}
                 placeholder="E-mail"
                 value={formData.email}
@@ -271,6 +292,9 @@ export default function RegisterScreen() {
                 keyboardType="email-address"
                 autoCapitalize="none"
                 placeholderTextColor="#9CA3AF"
+                returnKeyType="next"
+                onSubmitEditing={() => phoneRef.current && phoneRef.current.focus()}
+                blurOnSubmit={false}
               />
             </View>
 
@@ -278,12 +302,16 @@ export default function RegisterScreen() {
             <View style={styles.inputContainer}>
               <Phone size={20} color="#6B7280" style={styles.inputIcon} />
               <TextInput
+                ref={phoneRef}
                 style={styles.input}
                 placeholder="Telefone"
                 value={formData.phone}
                 onChangeText={(text) => setFormData({ ...formData, phone: text })}
                 keyboardType="phone-pad"
                 placeholderTextColor="#9CA3AF"
+                returnKeyType="next"
+                onSubmitEditing={() => (role === 'admin' ? companyRef.current && companyRef.current.focus() : (role === 'worker' ? inviteCodeRef.current && inviteCodeRef.current.focus() : null))}
+                blurOnSubmit={false}
               />
             </View>
 
@@ -293,33 +321,45 @@ export default function RegisterScreen() {
                 <View style={styles.inputContainer}>
                   <Building2 size={20} color="#6B7280" style={styles.inputIcon} />
                   <TextInput
+                    ref={companyRef}
                     style={styles.input}
                     placeholder="Nome da empresa"
                     value={formData.company}
                     onChangeText={(text) => setFormData({ ...formData, company: text })}
                     placeholderTextColor="#9CA3AF"
+                    returnKeyType="next"
+                    onSubmitEditing={() => inviteCodeRef.current && inviteCodeRef.current.focus()}
+                    blurOnSubmit={false}
                   />
                 </View>
 
                 <View style={styles.inputContainer}>
                   <Key size={20} color="#6B7280" style={styles.inputIcon} />
                   <TextInput
+                    ref={inviteCodeRef}
                     style={styles.input}
                     placeholder="Código do convite (opcional)"
                     value={formData.inviteCode}
                     onChangeText={(text) => setFormData({ ...formData, inviteCode: text })}
                     placeholderTextColor="#9CA3AF"
+                    returnKeyType="next"
+                    onSubmitEditing={() => siteNameRef.current && siteNameRef.current.focus()}
+                    blurOnSubmit={false}
                   />
                 </View>
 
                 <View style={styles.inputContainer}>
                   <Building2 size={20} color="#6B7280" style={styles.inputIcon} />
                   <TextInput
+                    ref={siteNameRef}
                     style={styles.input}
                     placeholder="Nome da obra (se não usar convite)"
                     value={formData.siteName}
                     onChangeText={(text) => setFormData({ ...formData, siteName: text })}
                     placeholderTextColor="#9CA3AF"
+                    returnKeyType="next"
+                    onSubmitEditing={() => passwordRef.current && passwordRef.current.focus()}
+                    blurOnSubmit={false}
                   />
                 </View>
 
@@ -329,8 +369,6 @@ export default function RegisterScreen() {
                   onChangeText={(text) => setFormData({ ...formData, siteAddress: text })}
                   onAddressSelect={(address, lat, lng) => {
                     setFormData({ ...formData, siteAddress: address });
-                    // Aqui você pode salvar as coordenadas se necessário
-                    console.log('Endereço selecionado:', address, 'Coordenadas:', { lat, lng });
                   }}
                 />
 
@@ -349,11 +387,15 @@ export default function RegisterScreen() {
                 <View style={styles.inputContainer}>
                   <Key size={20} color="#6B7280" style={styles.inputIcon} />
                   <TextInput
+                    ref={inviteCodeRef}
                     style={styles.input}
                     placeholder="Código do convite"
                     value={formData.inviteCode}
                     onChangeText={(text) => setFormData({ ...formData, inviteCode: text })}
                     placeholderTextColor="#9CA3AF"
+                    returnKeyType="next"
+                    onSubmitEditing={() => funcaoRef.current && funcaoRef.current.focus()}
+                    blurOnSubmit={false}
                   />
                 </View>
                 <View style={styles.inputContainer}>
@@ -373,11 +415,15 @@ export default function RegisterScreen() {
                   <View style={styles.inputContainer}>
                     <User size={20} color="#6B7280" style={styles.inputIcon} />
                     <TextInput
+                      ref={funcaoOutroRef}
                       style={styles.input}
                       placeholder="Digite sua função"
                       value={formData.funcaoOutro}
                       onChangeText={(text) => setFormData({ ...formData, funcaoOutro: text })}
                       placeholderTextColor="#9CA3AF"
+                      returnKeyType="next"
+                      onSubmitEditing={() => confirmPasswordRef.current && confirmPasswordRef.current.focus()}
+                      blurOnSubmit={false}
                     />
                   </View>
                 )}
@@ -388,12 +434,16 @@ export default function RegisterScreen() {
             <View style={styles.inputContainer}>
               <Lock size={20} color="#6B7280" style={styles.inputIcon} />
               <TextInput
+                ref={passwordRef}
                 style={styles.input}
                 placeholder="Senha"
                 value={formData.password}
                 onChangeText={(text) => setFormData({ ...formData, password: text })}
                 secureTextEntry={!showPassword}
                 placeholderTextColor="#9CA3AF"
+                returnKeyType="next"
+                onSubmitEditing={() => confirmPasswordRef.current && confirmPasswordRef.current.focus()}
+                blurOnSubmit={false}
               />
               <TouchableOpacity
                 onPress={() => setShowPassword(!showPassword)}
@@ -411,12 +461,15 @@ export default function RegisterScreen() {
             <View style={styles.inputContainer}>
               <Lock size={20} color="#6B7280" style={styles.inputIcon} />
               <TextInput
+                ref={confirmPasswordRef}
                 style={styles.input}
                 placeholder="Confirmar senha"
                 value={formData.confirmPassword}
                 onChangeText={(text) => setFormData({ ...formData, confirmPassword: text })}
                 secureTextEntry={!showConfirmPassword}
                 placeholderTextColor="#9CA3AF"
+                returnKeyType="done"
+                onSubmitEditing={handleRegister}
               />
               <TouchableOpacity
                 onPress={() => setShowConfirmPassword(!showConfirmPassword)}
@@ -487,7 +540,7 @@ export default function RegisterScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#1F2937', // Cor de fundo moderna
+    backgroundColor: '#18344A', // azul escuro que combina com o logo
   },
   keyboardView: {
     flex: 1,
@@ -510,13 +563,13 @@ const styles = StyleSheet.create({
     width: 120,
     height: 120,
     borderRadius: 60,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    backgroundColor: '#E6F4FA', // tom claro azul que combina com o logo
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 32,
     borderWidth: 3,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
-    shadowColor: '#000',
+    borderColor: '#38A3C0', // azul do logo
+    shadowColor: '#38A3C0', // azul do logo
     shadowOffset: {
       width: 0,
       height: 4,

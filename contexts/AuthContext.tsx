@@ -28,7 +28,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(currentUser);
       }
     } catch (error) {
-      console.error('Erro ao carregar usuário:', error);
+      // console.error('Erro ao carregar usuário:', error);
     } finally {
       setLoading(false);
     }
@@ -42,7 +42,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       return success;
     } catch (error) {
-      console.error('Erro ao fazer login:', error);
+      // console.error('Erro ao fazer login:', error);
       return false;
     }
   }
@@ -52,7 +52,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await AuthService.logout(); // Corrigido!
       setUser(null);
     } catch (error) {
-      console.error('Erro ao fazer logout:', error);
+      // console.error('Erro ao fazer logout:', error);
     }
   }
 

@@ -33,12 +33,10 @@ export default function AdminNotificationsScreen() {
           return;
         }
         unsubscribe = await AdminService.subscribeToNotifications((notificationsData) => {
-          console.log('Admin Notifications - Atualização de notificações recebida:', notificationsData);
           setNotifications(notificationsData);
           setLoading(false);
         });
       } catch (error) {
-        console.error('Erro ao carregar notificações:', error);
         Alert.alert('Erro', 'Não foi possível carregar as notificações.');
         setLoading(false);
       }
@@ -67,7 +65,6 @@ export default function AdminNotificationsScreen() {
         )
       );
     } catch (error) {
-      console.error('Erro ao marcar notificação como lida:', error);
     }
   };
 
@@ -93,7 +90,6 @@ export default function AdminNotificationsScreen() {
                 prev.map(notif => ({ ...notif, read: true }))
               );
             } catch (error) {
-              console.error('Erro ao marcar todas como lidas:', error);
               Alert.alert('Erro', 'Não foi possível marcar todas como lidas.');
             }
           },

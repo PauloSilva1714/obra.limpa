@@ -25,31 +25,23 @@ export const ConnectionStatus: React.FC<ConnectionStatusProps> = ({
   const checkConnection = async () => {
     setIsChecking(true);
     try {
-      console.log('🔍 Verificando conexão com Firebase...');
-      
       // Primeiro, verificar se o Firebase está inicializado
       if (!app) {
-        console.error('❌ Firebase app não está inicializado');
         setIsConnected(false);
         return;
       }
 
       if (!db) {
-        console.error('❌ Firestore não está inicializado');
         setIsConnected(false);
         return;
       }
 
-      console.log('✅ Firebase e Firestore inicializados');
-      
       // Agora fazer a verificação completa
       const connected = await checkFirebaseConnection();
       setIsConnected(connected);
       
-      console.log(`📡 Status da conexão: ${connected ? 'Conectado' : 'Desconectado'}`);
       onConnectionChange?.(connected);
     } catch (error) {
-      console.error('❌ Erro ao verificar conexão:', error);
       setIsConnected(false);
       onConnectionChange?.(false);
     } finally {
@@ -68,7 +60,6 @@ export const ConnectionStatus: React.FC<ConnectionStatusProps> = ({
         Alert.alert('Erro', 'Não foi possível restaurar a conexão. Verifique a internet e tente novamente.');
       }
     } catch (error) {
-      console.error('Erro na reconexão:', error);
       Alert.alert('Erro', 'Erro ao tentar reconectar. Verifique sua conexão com a internet.');
     } finally {
       setIsChecking(false);

@@ -16,7 +16,7 @@ import { EmailService } from '@/services/EmailService';
 import { useTranslation } from '@/config/i18n';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { ArrowLeft, Mail, UserPlus, X, CheckCircle, Clock, User } from 'lucide-react-native';
+import { ArrowLeft, Mail, UserPlus, X, CheckCircle, Clock, User, Trash2 } from 'lucide-react-native';
 import { useTheme } from '@/contexts/ThemeContext';
 import { FlatList } from 'react-native';
 
@@ -58,19 +58,13 @@ export default function InviteAdminScreen() {
     try {
       setLoadingInvites(true);
       const currentSite = await AuthService.getCurrentSite();
-      console.log('Site atual:', currentSite);
       
       if (currentSite) {
         const adminInvites = await AuthService.getAdminInvites(currentSite.id);
-        console.log('Convites de administrador carregados:', adminInvites);
         setInvites(adminInvites);
       } else {
-        console.log('Nenhum site selecionado');
         setInvites([]);
       }
-    } catch (error) {
-      console.error('Erro ao carregar convites:', error);
-      setInvites([]);
     } finally {
       setLoadingInvites(false);
     }
@@ -128,7 +122,6 @@ export default function InviteAdminScreen() {
       setIsValidEmail(false);
       await loadAdminInvites();
     } catch (error: any) {
-      console.error('Erro ao enviar convite:', error);
       Alert.alert('Erro', error.message || 'Erro ao enviar convite');
     } finally {
       setLoading(false);
@@ -143,7 +136,6 @@ export default function InviteAdminScreen() {
 
     setLoading(true);
     try {
-      console.log('🔍 Iniciando diagnóstico para:', email.trim());
       const result = await AuthService.diagnoseInviteProblem(email.trim());
       
       let message = '🔍 **DIAGNÓSTICO COMPLETO**\n\n';
@@ -172,7 +164,6 @@ export default function InviteAdminScreen() {
       Alert.alert('Diagnóstico', message);
       
     } catch (error: any) {
-      console.error('Erro no diagnóstico:', error);
       Alert.alert('Erro', 'Erro ao executar diagnóstico: ' + error.message);
     } finally {
       setLoading(false);
@@ -180,7 +171,6 @@ export default function InviteAdminScreen() {
   };
 
   const handleCancelInvite = (inviteId: string) => {
-    console.log('Tentando cancelar convite:', inviteId);
     setInviteToCancel(inviteId);
     setShowCancelModal(true);
   };
@@ -190,20 +180,12 @@ export default function InviteAdminScreen() {
     
     setCanceling(true);
     try {
-      console.log('Iniciando execução do cancelamento do convite:', inviteToCancel);
       await AuthService.cancelAdminInvite(inviteToCancel);
-      console.log('Convite cancelado com sucesso');
       await loadAdminInvites();
       Alert.alert('Sucesso', 'Convite cancelado com sucesso');
       setShowCancelModal(false);
       setInviteToCancel(null);
     } catch (error: any) {
-      console.error('Erro ao cancelar convite:', error);
-      console.error('Detalhes do erro:', {
-        message: error.message,
-        code: error.code,
-        stack: error.stack
-      });
       Alert.alert('Erro', error.message || 'Não foi possível cancelar o convite');
     } finally {
       setCanceling(false);
@@ -211,7 +193,6 @@ export default function InviteAdminScreen() {
   };
 
   const handleDeleteInvite = (inviteId: string) => {
-    console.log('Tentando excluir convite:', inviteId);
     setInviteToDelete(inviteId);
     setShowDeleteModal(true);
   };
@@ -221,20 +202,12 @@ export default function InviteAdminScreen() {
     
     setDeleting(true);
     try {
-      console.log('Iniciando execução da exclusão do convite:', inviteToDelete);
       await AuthService.deleteAdminInvite(inviteToDelete);
-      console.log('Convite excluído com sucesso');
       await loadAdminInvites();
       Alert.alert('Sucesso', 'Convite excluído com sucesso');
       setShowDeleteModal(false);
       setInviteToDelete(null);
     } catch (error: any) {
-      console.error('Erro ao excluir convite:', error);
-      console.error('Detalhes do erro:', {
-        message: error.message,
-        code: error.code,
-        stack: error.stack
-      });
       Alert.alert('Erro', error.message || 'Não foi possível excluir o convite');
     } finally {
       setDeleting(false);
@@ -292,81 +265,47 @@ export default function InviteAdminScreen() {
   };
 
   const renderInvite = ({ item }: { item: Invite }) => {
-    console.log('Renderizando convite:', item);
-    console.log('Status do convite:', item.status);
-    console.log('Deve mostrar botão de cancelar:', item.status === 'pending');
-    
     const isHovered = hoveredInvite === item.id;
     
     return (
-      <View style={[styles.inviteCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-        <View style={styles.inviteHeader}>
-          <View style={styles.inviteInfo}>
-            <Mail size={20} color={colors.primary} />
-            <Text style={[styles.inviteEmail, { color: colors.text }]}>{item.email}</Text>
+      <View style={[styles.inviteCard, { backgroundColor: colors.surface, borderColor: colors.border, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }]}>
+        <View style={{ flex: 1 }}>
+          <View style={styles.inviteHeader}>
+            <View style={styles.inviteInfo}>
+              <Mail size={20} color={colors.primary} />
+              <Text style={[styles.inviteEmail, { color: colors.text }]}>{item.email}</Text>
+            </View>
+            <View style={styles.statusContainer}>
+              {getStatusIcon(item.status)}
+              <Text style={[styles.statusText, { color: getStatusColor(item.status) }]}>
+                {getStatusText(item.status)}
+              </Text>
+            </View>
           </View>
-          <View style={styles.statusContainer}>
-            {getStatusIcon(item.status)}
-            <Text style={[styles.statusText, { color: getStatusColor(item.status) }]}>
-              {getStatusText(item.status)}
-            </Text>
-          </View>
+          <Text style={[styles.inviteDate, { color: colors.textMuted }]}>
+            Enviado em: {formatDate(item.createdAt)}
+          </Text>
         </View>
-        <Text style={[styles.inviteDate, { color: colors.textMuted }]}>
-          Enviado em: {formatDate(item.createdAt)}
-        </Text>
-        {item.status === 'pending' && (
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 8 }}>
           <TouchableOpacity
-            style={[
-              styles.cancelButton, 
-              { 
-                borderColor: colors.border,
-                backgroundColor: isHovered ? '#FEE2E2' : '#FEF2F2',
-                transform: [{ scale: isHovered ? 1.02 : 1 }],
-              }
-            ]}
-            onPress={() => {
-              console.log('Botão cancelar pressionado para convite:', item.id);
-              handleCancelInvite(item.id);
-            }}
+            style={{ marginRight: 8, padding: 6, borderRadius: 8, backgroundColor: isHovered ? '#FEE2E2' : 'transparent' }}
+            onPress={() => handleDeleteInvite(item.id)}
             onPressIn={() => setHoveredInvite(item.id)}
             onPressOut={() => setHoveredInvite(null)}
-            activeOpacity={0.8}
+            activeOpacity={0.7}
           >
-            <View style={styles.cancelButtonContent}>
-              <View style={[styles.cancelButtonIcon, { backgroundColor: isHovered ? '#FECACA' : '#FEE2E2' }]}>
-                <Ionicons name="close-circle" size={18} color="#DC2626" />
-              </View>
-              <Text style={styles.cancelButtonText}>Cancelar Convite</Text>
-            </View>
+            <Trash2 size={22} color="#dc2626" />
           </TouchableOpacity>
-        )}
-        {item.status === 'rejected' && (
           <TouchableOpacity
-            style={[
-              styles.deleteButton, 
-              { 
-                borderColor: colors.border,
-                backgroundColor: isHovered ? '#FEE2E2' : '#FEF2F2',
-                transform: [{ scale: isHovered ? 1.02 : 1 }],
-              }
-            ]}
-            onPress={() => {
-              console.log('Botão excluir pressionado para convite:', item.id);
-              handleDeleteInvite(item.id);
-            }}
+            style={{ paddingVertical: 6, paddingHorizontal: 12, borderRadius: 8, backgroundColor: isHovered ? '#FEE2E2' : 'transparent', borderWidth: 1, borderColor: '#dc2626' }}
+            onPress={() => handleDeleteInvite(item.id)}
             onPressIn={() => setHoveredInvite(item.id)}
             onPressOut={() => setHoveredInvite(null)}
-            activeOpacity={0.8}
+            activeOpacity={0.7}
           >
-            <View style={styles.deleteButtonContent}>
-              <View style={[styles.deleteButtonIcon, { backgroundColor: isHovered ? '#FECACA' : '#FEE2E2' }]}>
-                <Ionicons name="trash-outline" size={18} color="#DC2626" />
-              </View>
-              <Text style={styles.deleteButtonText}>Excluir Convite</Text>
-            </View>
+            <Text style={{ color: '#dc2626', fontWeight: 'bold' }}>Excluir</Text>
           </TouchableOpacity>
-        )}
+        </View>
       </View>
     );
   };
@@ -376,12 +315,10 @@ export default function InviteAdminScreen() {
       // Navegar diretamente para a tela de workers
       router.push('/(tabs)/admin/workers');
     } catch (error) {
-      console.log('Erro ao navegar, tentando voltar:', error);
       // Fallback: tentar voltar
       try {
         router.back();
       } catch (backError) {
-        console.log('Erro ao voltar também, indo para admin:', backError);
         router.push('/(tabs)/admin');
       }
     }
@@ -525,7 +462,6 @@ export default function InviteAdminScreen() {
                 style={[styles.modalButton, styles.cancelButton]}
                 onPress={() => {
                   if (!canceling) {
-                    console.log('Cancelamento negado pelo usuário');
                     setShowCancelModal(false);
                     setInviteToCancel(null);
                   }
@@ -573,7 +509,6 @@ export default function InviteAdminScreen() {
                 style={[styles.modalButton, styles.cancelButton]}
                 onPress={() => {
                   if (!deleting) {
-                    console.log('Exclusão negada pelo usuário');
                     setShowDeleteModal(false);
                     setInviteToDelete(null);
                   }

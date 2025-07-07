@@ -7,6 +7,7 @@ import {
   FlatList,
   Alert,
   SafeAreaView,
+  Modal,
 } from 'react-native';
 import { router } from 'expo-router';
 import { Plus, Edit, Trash2, ArrowLeft, UserPlus, Crown } from 'lucide-react-native';
@@ -34,10 +35,12 @@ export default function WorkersScreen() {
   const [invites, setInvites] = useState<Invite[]>([]);
   const [loading, setLoading] = useState(true);
   const [siteId, setSiteId] = useState<string | null>(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [workerToDelete, setWorkerToDelete] = useState<string | null>(null);
 
   useEffect(() => {
     AuthService.getCurrentSite().then(site => {
-      console.log('Admin Workers - Site selecionado:', site?.id);
       setSiteId(site?.id ?? null);
     });
   }, []);
@@ -46,12 +49,10 @@ export default function WorkersScreen() {
     if (!siteId) return;
     setLoading(true);
     const unsubscribeWorkers = AuthService.subscribeToWorkers(siteId, (workersData) => {
-      console.log('Admin Workers - Atualização de workers recebida:', workersData);
       setWorkers(workersData);
       setLoading(false);
     });
     const unsubscribeInvites = AuthService.subscribeToInvites(siteId, (invitesData) => {
-      console.log('Admin Workers - Atualização de invites recebida:', invitesData);
       setInvites(invitesData);
     });
     return () => {
@@ -70,7 +71,6 @@ export default function WorkersScreen() {
       setWorkers(workersData);
       setInvites(invitesData);
     } catch (error) {
-      console.error('Erro ao carregar dados:', error);
       Alert.alert('Erro', 'Não foi possível carregar os dados');
     } finally {
       setLoading(false);
@@ -96,31 +96,20 @@ export default function WorkersScreen() {
     });
   };
 
-  const handleDeleteWorker = async (workerId: string) => {
-    Alert.alert(
-      'Confirmar exclusão',
-      'Tem certeza que deseja remover este colaborador?',
-      [
-        {
-          text: 'Cancelar',
-          style: 'cancel',
-        },
-        {
-          text: 'Remover',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await AuthService.getInstance().removeWorker(workerId);
-              await loadData();
-              Alert.alert('Sucesso', 'Colaborador removido com sucesso');
-            } catch (error) {
-              console.error('Erro ao remover colaborador:', error);
-              Alert.alert('Erro', 'Não foi possível remover o colaborador');
-            }
-          },
-        },
-      ]
-    );
+  const handleDeleteWorker = async () => {
+    if (!workerToDelete) return;
+    setDeleteLoading(true);
+    try {
+      await AuthService.getInstance().removeWorker(workerToDelete);
+      setShowDeleteModal(false);
+      setWorkerToDelete(null);
+      await loadData();
+      Alert.alert('Sucesso', 'Colaborador removido com sucesso');
+    } catch (error) {
+      Alert.alert('Erro', 'Não foi possível remover o colaborador');
+    } finally {
+      setDeleteLoading(false);
+    }
   };
 
   const handleCancelInvite = async (inviteId: string) => {
@@ -141,7 +130,6 @@ export default function WorkersScreen() {
               await loadData();
               Alert.alert('Sucesso', 'Convite cancelado com sucesso');
             } catch (error) {
-              console.error('Erro ao cancelar convite:', error);
               Alert.alert('Erro', 'Não foi possível cancelar o convite');
             }
           },
@@ -166,7 +154,10 @@ export default function WorkersScreen() {
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.actionButton}
-            onPress={() => handleDeleteWorker(item.id)}
+            onPress={() => {
+              setWorkerToDelete(item.id);
+              setShowDeleteModal(true);
+            }}
           >
             <Trash2 size={20} color="#666" />
           </TouchableOpacity>
@@ -284,6 +275,39 @@ export default function WorkersScreen() {
           contentContainerStyle={styles.list}
         />
       )}
+
+      {/* Modal de confirmação de exclusão */}
+      <Modal
+        visible={showDeleteModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowDeleteModal(false)}
+      >
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' }}>
+          <View style={{ width: '85%', backgroundColor: '#fff', borderRadius: 16, padding: 24, alignItems: 'center' }}>
+            <Text style={{ fontSize: 20, fontWeight: 'bold', color: '#EF4444', marginBottom: 12 }}>Remover Colaborador</Text>
+            <Text style={{ fontSize: 16, color: '#374151', textAlign: 'center', marginBottom: 24 }}>
+              Tem certeza que deseja remover este colaborador? Esta ação não pode ser desfeita.
+            </Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', width: '100%' }}>
+              <TouchableOpacity
+                style={{ flex: 1, marginRight: 8, backgroundColor: '#E5E7EB', borderRadius: 8, padding: 12, alignItems: 'center' }}
+                onPress={() => setShowDeleteModal(false)}
+                disabled={deleteLoading}
+              >
+                <Text style={{ color: '#374151', fontSize: 16 }}>Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={{ flex: 1, marginLeft: 8, backgroundColor: '#EF4444', borderRadius: 8, padding: 12, alignItems: 'center' }}
+                onPress={handleDeleteWorker}
+                disabled={deleteLoading}
+              >
+                <Text style={{ color: '#fff', fontSize: 16 }}>{deleteLoading ? 'Removendo...' : 'Remover'}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }

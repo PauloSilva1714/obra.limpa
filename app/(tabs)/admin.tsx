@@ -9,6 +9,7 @@ import {
   SafeAreaView,
   Modal,
   FlatList,
+  Image,
 } from 'react-native';
 import { router } from 'expo-router';
 import {
@@ -26,10 +27,11 @@ import {
   RefreshCw,
   MessageCircle,
 } from 'lucide-react-native';
-import { AuthService, User } from '@/services/AuthService';
+import { AuthService, User, Site } from '@/services/AuthService';
 import { AdminService } from '@/services/AdminService';
 import { useTheme } from '@/contexts/ThemeContext';
 import { t } from '@/config/i18n';
+import logo from '../(auth)/obra-limpa-logo.png';
 
 interface AdminStats {
   totalSites: number;
@@ -53,7 +55,7 @@ export default function AdminScreen() {
   const [workers, setWorkers] = useState<User[]>([]);
   const [loadingWorkers, setLoadingWorkers] = useState(false);
   const [sitesModalVisible, setSitesModalVisible] = useState(false);
-  const [sites, setSites] = useState([]);
+  const [sites, setSites] = useState<Site[]>([]);
   const [loadingSites, setLoadingSites] = useState(false);
 
   useEffect(() => {
@@ -76,13 +78,10 @@ export default function AdminScreen() {
     try {
       setLoading(true);
       setError(null);
-      console.log('[AdminScreen] Carregando estatísticas...');
       const adminStats = await AdminService.getAdminStats();
-      console.log('[AdminScreen] Estatísticas carregadas:', adminStats);
       setStats(adminStats);
     } catch (err) {
       setError('Falha ao carregar as estatísticas. Tente novamente mais tarde.');
-      console.error('Erro ao carregar estatísticas:', err);
     } finally {
       setLoading(false);
     }
@@ -260,7 +259,7 @@ export default function AdminScreen() {
           <AdminCard
             title="Gerenciar Obras"
             subtitle="Criar, editar e visualizar obras"
-            icon={<Building2 size={24} color={colors.primary} />}
+            icon={<Image source={logo} style={{ width: 32, height: 32, resizeMode: 'contain' }} />}
             onPress={() => router.push('/admin/sites')}
             color={colors.primary}
           />

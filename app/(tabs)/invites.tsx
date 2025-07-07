@@ -35,7 +35,6 @@ export default function InvitesScreen() {
           const data = await InviteService.getPendingInvites();
           setInvites(data as Invite[]);
         } catch (error) {
-          console.error('Erro ao carregar convites do admin:', error);
           Alert.alert('Erro', 'Não foi possível carregar os convites pendentes.');
         }
       } else {
@@ -59,7 +58,6 @@ export default function InvitesScreen() {
         const data = await InviteService.getPendingInvites();
         setInvites(data as Invite[]);
       } catch (error) {
-        console.error('Erro ao recarregar convites do admin:', error);
         Alert.alert('Erro', 'Não foi possível recarregar os convites.');
       }
     } else {
@@ -74,7 +72,6 @@ export default function InvitesScreen() {
   };
 
   const handleCancelOrDeleteInvite = (inviteId: string) => {
-    console.log('Botão de excluir/cancelar clicado. ID do convite:', inviteId);
     setInviteToDelete(inviteId);
     setConfirmModalVisible(true);
   };
@@ -83,21 +80,16 @@ export default function InvitesScreen() {
     if (!inviteToDelete) return;
 
     const isUserAdmin = user?.role === 'admin';
-    console.log('Confirmada a exclusão. Usuário é admin?', isUserAdmin);
 
     try {
       if (isUserAdmin) {
-        console.log('Chamando InviteService.deleteInvite com o ID:', inviteToDelete);
         await InviteService.deleteInvite(inviteToDelete);
       } else {
-        console.log('Chamando AuthService.cancelInvite com o ID:', inviteToDelete);
         await AuthService.getInstance().cancelInvite(inviteToDelete);
       }
-      console.log('Ação de exclusão/cancelamento concluída. Recarregando convites.');
       await fetchInvites();
       Alert.alert('Sucesso', `Convite ${isUserAdmin ? 'excluído' : 'cancelado'} com sucesso`);
     } catch (error) {
-      console.error('Erro ao processar o convite:', error);
       Alert.alert('Erro', `Não foi possível ${isUserAdmin ? 'excluir' : 'cancelar'} o convite`);
     } finally {
       setConfirmModalVisible(false);

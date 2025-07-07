@@ -10,6 +10,7 @@ import {
   Platform,
   Animated,
   Dimensions,
+  Image,
 } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -22,8 +23,12 @@ import {
   Inter_600SemiBold,
   Inter_700Bold,
 } from '@expo-google-fonts/inter';
+import logo from './obra-limpa-logo.png';
 
 const { width } = Dimensions.get('window');
+
+// Detecta se está rodando no web
+const isWeb = typeof document !== 'undefined';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
@@ -66,7 +71,7 @@ export default function LoginScreen() {
       <SafeAreaView style={styles.container}>
         <View style={styles.headerContainer}>
           <View style={styles.logoContainer}>
-            <Building2 size={64} color="#FFFFFF" strokeWidth={3} />
+            <Image source={logo} style={{ width: 90, height: 90, resizeMode: 'contain' }} />
           </View>
           <Text style={styles.titleFallback}>Obra Limpa</Text>
           <Text style={styles.subtitleFallback}>Sistema de Gestão Inteligente</Text>
@@ -83,9 +88,7 @@ export default function LoginScreen() {
 
     setLoading(true);
     try {
-      console.log('Tentando fazer login...');
       const success = await AuthService.login(email.trim(), password);
-      console.log('Resultado do login:', success);
 
       if (success) {
         const user = await AuthService.getCurrentUser();
@@ -98,14 +101,12 @@ export default function LoginScreen() {
           }
         } else {
           await AuthService.setCurrentSite(null);
-          console.log('Redirecionando para seleção de canteiro');
           router.replace('/(auth)/site-selection');
         }
       } else {
         Alert.alert('Erro', 'Credenciais inválidas. Tente novamente.');
       }
     } catch (error) {
-      console.error('Erro ao fazer login:', error);
       Alert.alert('Erro', 'Erro ao fazer login. Tente novamente.');
     } finally {
       setLoading(false);
@@ -123,6 +124,117 @@ export default function LoginScreen() {
     });
   };
 
+  // JSX do formulário
+  const LoginForm = (
+    <Animated.View 
+      style={[
+        styles.form,
+        {
+          opacity: fadeAnim,
+          transform: [{ translateY: slideAnim }]
+        }
+      ]}
+    >
+      <Text style={styles.welcomeText}>Bem-vindo de volta!</Text>
+      <Text style={styles.loginText}>Faça login para continuar</Text>
+
+      {/* Campo de Email */}
+      <View style={styles.inputContainer}>
+        <Mail size={20} color="#6B7280" style={styles.inputIcon} />
+        <TextInput
+          style={styles.input}
+          placeholder="Digite seu e-mail"
+          value={email}
+          onChangeText={setEmail}
+          keyboardType="email-address"
+          autoCapitalize="none"
+          placeholderTextColor="#9CA3AF"
+          returnKeyType="next"
+          onSubmitEditing={() => passwordInputRef.current?.focus()}
+        />
+      </View>
+
+      {/* Campo de Senha */}
+      <View style={styles.inputContainer}>
+        <Lock size={20} color="#6B7280" style={styles.inputIcon} />
+        <TextInput
+          ref={passwordInputRef}
+          style={styles.input}
+          placeholder="Digite sua senha"
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry={!showPassword}
+          placeholderTextColor="#9CA3AF"
+          onSubmitEditing={handleLogin}
+          textContentType={isWeb ? undefined : 'password'}
+        />
+        <TouchableOpacity
+          onPress={() => setShowPassword(!showPassword)}
+          style={styles.eyeButton}
+        >
+          {showPassword ? (
+            <EyeOff size={20} color="#6B7280" />
+          ) : (
+            <Eye size={20} color="#6B7280" />
+          )}
+        </TouchableOpacity>
+      </View>
+
+      {/* Esqueceu a senha */}
+      <TouchableOpacity
+        style={styles.forgotPasswordButton}
+        onPress={handleForgotPassword}
+      >
+        <Text style={styles.forgotPasswordText}>Esqueceu sua senha?</Text>
+      </TouchableOpacity>
+
+      {/* Botão de Login */}
+      <TouchableOpacity
+        style={[styles.loginButton, loading && styles.buttonDisabled]}
+        onPress={handleLogin}
+        disabled={loading}
+        activeOpacity={0.8}
+      >
+        <Text style={styles.loginButtonText}>
+          {loading ? 'Entrando...' : 'Entrar'}
+        </Text>
+        <ArrowRight size={20} color="#FFFFFF" />
+      </TouchableOpacity>
+
+      {/* Divisor */}
+      <View style={styles.divider}>
+        <View style={styles.dividerLine} />
+        <Text style={styles.dividerText}>ou</Text>
+        <View style={styles.dividerLine} />
+      </View>
+
+      {/* Seção de Registro */}
+      <View style={styles.registerSection}>
+        <Text style={styles.registerTitle}>Novo por aqui?</Text>
+        <TouchableOpacity
+          style={styles.registerButton}
+          onPress={() => handleRegister('admin')}
+          disabled={loading}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.registerButtonText}>
+            Cadastrar como Administrador
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.registerButton}
+          onPress={() => handleRegister('worker')}
+          disabled={loading}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.registerButtonText}>
+            Cadastrar como Colaborador
+          </Text>
+        </TouchableOpacity>
+      </View>
+    </Animated.View>
+  );
+
   return (
     <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView
@@ -132,120 +244,28 @@ export default function LoginScreen() {
         {/* Header fixo no topo */}
         <View style={styles.headerContainer}>
           <View style={styles.logoContainer}>
-            <Building2 size={64} color="#FFFFFF" strokeWidth={3} />
+            <Image source={logo} style={{ width: 90, height: 90, resizeMode: 'contain' }} />
           </View>
           <Text style={styles.title}>Obra Limpa</Text>
           <Text style={styles.subtitle}>Sistema de Gestão Inteligente</Text>
         </View>
 
-        {/* Form com scroll se necessário */}
+        {/* Formulário com ou sem <form> */}
         <View style={styles.formContainer}>
-          <Animated.View 
-            style={[
-              styles.form,
-              {
-                opacity: fadeAnim,
-                transform: [{ translateY: slideAnim }]
-              }
-            ]}
-          >
-            <Text style={styles.welcomeText}>Bem-vindo de volta!</Text>
-            <Text style={styles.loginText}>Faça login para continuar</Text>
-
-            {/* Campo de Email */}
-            <View style={styles.inputContainer}>
-              <Mail size={20} color="#6B7280" style={styles.inputIcon} />
-              <TextInput
-                style={styles.input}
-                placeholder="Digite seu e-mail"
-                value={email}
-                onChangeText={setEmail}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                placeholderTextColor="#9CA3AF"
-                returnKeyType="next"
-                onSubmitEditing={() => passwordInputRef.current?.focus()}
-              />
-            </View>
-
-            {/* Campo de Senha */}
-            <View style={styles.inputContainer}>
-              <Lock size={20} color="#6B7280" style={styles.inputIcon} />
-              <TextInput
-                ref={passwordInputRef}
-                style={styles.input}
-                placeholder="Digite sua senha"
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry={!showPassword}
-                placeholderTextColor="#9CA3AF"
-                onSubmitEditing={handleLogin}
-              />
-              <TouchableOpacity
-                onPress={() => setShowPassword(!showPassword)}
-                style={styles.eyeButton}
-              >
-                {showPassword ? (
-                  <EyeOff size={20} color="#6B7280" />
-                ) : (
-                  <Eye size={20} color="#6B7280" />
-                )}
-              </TouchableOpacity>
-            </View>
-
-            {/* Esqueceu a senha */}
-            <TouchableOpacity
-              style={styles.forgotPasswordButton}
-              onPress={handleForgotPassword}
+          {isWeb ? (
+            <form
+              onSubmit={e => {
+                e.preventDefault();
+                handleLogin();
+              }}
+              autoComplete="on"
+              style={{ width: '100%' }}
             >
-              <Text style={styles.forgotPasswordText}>Esqueceu sua senha?</Text>
-            </TouchableOpacity>
-
-            {/* Botão de Login */}
-            <TouchableOpacity
-              style={[styles.loginButton, loading && styles.buttonDisabled]}
-              onPress={handleLogin}
-              disabled={loading}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.loginButtonText}>
-                {loading ? 'Entrando...' : 'Entrar'}
-              </Text>
-              <ArrowRight size={20} color="#FFFFFF" />
-            </TouchableOpacity>
-
-            {/* Divisor */}
-            <View style={styles.divider}>
-              <View style={styles.dividerLine} />
-              <Text style={styles.dividerText}>ou</Text>
-              <View style={styles.dividerLine} />
-            </View>
-
-            {/* Seção de Registro */}
-            <View style={styles.registerSection}>
-              <Text style={styles.registerTitle}>Novo por aqui?</Text>
-              <TouchableOpacity
-                style={styles.registerButton}
-                onPress={() => handleRegister('admin')}
-                disabled={loading}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.registerButtonText}>
-                  Cadastrar como Administrador
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.registerButton}
-                onPress={() => handleRegister('worker')}
-                disabled={loading}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.registerButtonText}>
-                  Cadastrar como Colaborador
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </Animated.View>
+              {LoginForm}
+            </form>
+          ) : (
+            LoginForm
+          )}
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -255,7 +275,7 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#1F2937', // Cor de fundo moderna
+    backgroundColor: '#18344A', // azul escuro que combina com o logo
   },
   keyboardView: {
     flex: 1,
@@ -272,13 +292,13 @@ const styles = StyleSheet.create({
     width: 120,
     height: 120,
     borderRadius: 60,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    backgroundColor: '#E6F4FA', // tom claro azul que combina com o logo
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 32,
     borderWidth: 3,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
-    shadowColor: '#000',
+    borderColor: '#38A3C0', // azul do logo
+    shadowColor: '#38A3C0', // azul do logo
     shadowOffset: {
       width: 0,
       height: 4,
@@ -293,9 +313,7 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     textAlign: 'center',
     marginBottom: 16,
-    textShadowColor: 'rgba(0,0,0,0.5)',
-    textShadowOffset: { width: 0, height: 3 },
-    textShadowRadius: 10,
+    textShadow: '0px 3px 10px rgba(0,0,0,0.5)',
     fontWeight: '900',
     letterSpacing: 2,
     includeFontPadding: false,
@@ -307,9 +325,7 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.9)',
     textAlign: 'center',
     letterSpacing: 0.8,
-    textShadowColor: 'rgba(0,0,0,0.3)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 4,
+    textShadow: '0px 1px 4px rgba(0,0,0,0.3)',
   },
   formContainer: {
     flex: 1,
@@ -454,9 +470,7 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     textAlign: 'center',
     marginBottom: 16,
-    textShadowColor: 'rgba(0,0,0,0.5)',
-    textShadowOffset: { width: 0, height: 3 },
-    textShadowRadius: 10,
+    textShadow: '0px 3px 10px rgba(0,0,0,0.5)',
     letterSpacing: 2,
   },
   subtitleFallback: {
@@ -465,8 +479,6 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.9)',
     textAlign: 'center',
     letterSpacing: 0.8,
-    textShadowColor: 'rgba(0,0,0,0.3)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 4,
+    textShadow: '0px 1px 4px rgba(0,0,0,0.3)',
   },
 });

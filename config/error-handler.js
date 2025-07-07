@@ -3,6 +3,15 @@ export class ErrorHandler {
   static handleNetworkError(error) {
     console.error('[ErrorHandler] Erro de rede detectado:', error);
     
+    // Verificar se o erro existe e tem propriedades
+    if (!error) {
+      return {
+        type: 'NULL_ERROR',
+        message: 'Erro nulo detectado',
+        retry: false
+      };
+    }
+    
     // Verificar se é um erro 400
     if (error.status === 400 || error.message?.includes('400')) {
       console.log('[ErrorHandler] Erro 400 detectado, tentando resolver...');

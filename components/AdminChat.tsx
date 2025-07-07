@@ -40,34 +40,6 @@ export default function AdminChat({ siteId, style }: AdminChatProps) {
   const unsubscribeMessages = useRef<(() => void) | null>(null);
   const unsubscribeNotifications = useRef<(() => void) | null>(null);
 
-  // Log para rastrear o siteId recebido
-  console.log('🎯 AdminChat - siteId recebido:', siteId, 'tipo:', typeof siteId);
-
-  // Validação do siteId
-  if (!siteId) {
-    console.error('❌ AdminChat - siteId é undefined ou null, renderizando erro');
-    return (
-      <View style={[styles.container, { backgroundColor: colors.background }, style]}>
-        <Text style={[styles.errorText, { color: colors.text }]}>
-          ID da obra não fornecido
-        </Text>
-      </View>
-    );
-  }
-
-  if (typeof siteId !== 'string') {
-    console.error('❌ AdminChat - siteId não é uma string:', siteId, 'tipo:', typeof siteId);
-    return (
-      <View style={[styles.container, { backgroundColor: colors.background }, style]}>
-        <Text style={[styles.errorText, { color: colors.text }]}>
-          ID da obra inválido (deve ser uma string)
-        </Text>
-      </View>
-    );
-  }
-
-  console.log('✅ AdminChat - siteId válido, continuando com a renderização');
-
   useEffect(() => {
     const initializeComponent = async () => {
       try {
@@ -103,20 +75,14 @@ export default function AdminChat({ siteId, style }: AdminChatProps) {
 
   const loadInitialData = async () => {
     try {
-      console.log('🔄 AdminChat.loadInitialData() - Iniciando carregamento com siteId:', siteId);
       setLoading(true);
       
-      console.log('📨 AdminChat.loadInitialData() - Chamando AdminService.getMessages...');
       const messagesData = await AdminService.getMessages(siteId);
-      console.log('✅ AdminChat.loadInitialData() - Mensagens carregadas:', messagesData.length, 'mensagens');
       
-      console.log('🔔 AdminChat.loadInitialData() - Chamando AdminService.getNotifications...');
       const notificationsData = await AdminService.getNotifications();
-      console.log('✅ AdminChat.loadInitialData() - Notificações carregadas:', notificationsData.length, 'notificações');
       
       setMessages(messagesData);
       setNotifications(notificationsData);
-      console.log('✅ AdminChat.loadInitialData() - Dados carregados com sucesso');
     } catch (error) {
       console.error('❌ AdminChat.loadInitialData() - Erro ao carregar dados iniciais:', error);
       Alert.alert('Erro', 'Não foi possível carregar as mensagens');

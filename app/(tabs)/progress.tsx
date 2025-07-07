@@ -39,17 +39,15 @@ export default function ProgressScreen() {
 
   const loadData = async () => {
     try {
-      console.log('[ProgressScreen] Carregando dados...');
+      setLoading(true);
+      setRefreshing(true);
       const [progress, tasksData] = await Promise.all([
         ProgressService.getInstance().getProgressData(),
         taskService.getTasks()
       ]);
       
-      console.log('[ProgressScreen] Dados carregados:', { progress, tasksCount: tasksData.length });
       setProgressData(progress);
       setTasks(tasksData);
-    } catch (error) {
-      console.error('[ProgressScreen] Erro ao carregar dados:', error);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -99,9 +97,6 @@ export default function ProgressScreen() {
     const date = new Date(dateString);
     return date.toLocaleDateString('pt-BR');
   };
-
-  // Log para depuração
-  console.log('Tarefas carregadas para o gráfico:', tasks.map(t => ({ id: t.id, status: t.status, siteId: t.siteId })));
 
   // Cálculo dos status diretamente das tarefas carregadas
   const completedTasks = tasks.filter(t => t.status === 'completed').length;

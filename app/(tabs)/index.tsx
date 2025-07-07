@@ -47,7 +47,7 @@ import { EmailService } from '@/services/EmailService';
 import { TaskModal } from '@/components/TaskModal';
 import { useTheme } from '@/contexts/ThemeContext';
 import { t } from '@/config/i18n';
-import { Video, ResizeMode } from 'expo-av';
+import { Video as ExpoVideo, ResizeMode } from 'expo-av';
 
 export default function TasksScreen() {
   const { colors } = useTheme();
@@ -83,17 +83,13 @@ export default function TasksScreen() {
 
     const initializeScreen = async () => {
       try {
-        console.log('Inicializando tela de tarefas...');
-        const role = await AuthService.getUserRole();
-        const user = await AuthService.getCurrentUser();
-        console.log('Papel do usuário na tela de tarefas:', role);
-
-        setUserRole(role);
-        setCurrentUser(user);
         await loadTasks();
         setIsInitialized(true);
       } catch (error) {
-        console.error('Erro ao inicializar tela de tarefas:', error);
+        Alert.alert(t('error'), 'Erro ao inicializar tela de tarefas.');
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
       }
     };
 
@@ -112,11 +108,9 @@ export default function TasksScreen() {
   const loadTasks = async () => {
     try {
       const siteTasks = await taskService.getTasks();
-      console.log('Tarefas carregadas:', siteTasks);
       setTasks(siteTasks);
       setFilteredTasks(siteTasks);
     } catch (error) {
-      console.error('Erro ao carregar tarefas:', error);
       Alert.alert(t('error'), 'Erro ao carregar tarefas.');
     } finally {
       setLoading(false);
@@ -230,20 +224,16 @@ export default function TasksScreen() {
       );
       
     } catch (error) {
-      console.error('Erro ao salvar tarefa:', error);
       Alert.alert(t('error'), 'Erro ao salvar tarefa.');
     }
   };
 
   const handleDeleteTask = async (taskId: string) => {
     try {
-      console.log('Tentando excluir tarefa:', taskId);
       await taskService.deleteTask(taskId);
-      console.log('Tarefa excluída com sucesso');
       await loadTasks();
       Alert.alert(t('success'), 'Tarefa excluída com sucesso!');
     } catch (error) {
-      console.error('Erro ao excluir tarefa:', error);
       Alert.alert(t('error'), 'Erro ao excluir tarefa.');
     }
   };
@@ -349,13 +339,11 @@ export default function TasksScreen() {
 
       await TaskService.addComment(selectedTaskForComments.id, comment);
       
-      // Atualizar a lista de tarefas
       await loadTasks();
       
       setNewComment('');
       Alert.alert('Sucesso', 'Comentário adicionado!');
     } catch (error) {
-      console.error('Erro ao adicionar comentário:', error);
       Alert.alert('Erro', 'Erro ao adicionar comentário.');
     }
   };
@@ -696,13 +684,11 @@ export default function TasksScreen() {
                   item.type === 'photo' ? (
                     <Image source={{ uri: item.url }} style={styles.igMedia} />
                   ) : (
-                    <Video
-                      source={{ uri: item.url }}
-                      style={styles.igMedia}
-                      useNativeControls
-                      resizeMode={ResizeMode.COVER}
-                      isLooping
-                    />
+                    Platform.OS === 'web' ? (
+                      <video src={item.url} controls style={styles.igMedia} />
+                    ) : (
+                      <ExpoVideo source={{ uri: item.url }} style={styles.igMedia} useNativeControls resizeMode={ResizeMode.COVER} isLooping />
+                    )
                   )
                 )}
               />
